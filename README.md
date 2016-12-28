@@ -34,7 +34,7 @@ cd $GOPATH
 mkdir bin
 mkdir pkg
 mkdir -p src/github.com/blackducksoftware
-cd src/blackducksoftware
+cd src/github.com/blackducksoftware
 git clone https://github.com/blackducksoftware/ose-scanner.git
 cd ose-scanner
 make
@@ -47,7 +47,6 @@ To install the components of this integration, build them and then copy the cont
 ```
 docker load < ./hub_ose_scanner.tar
 docker load < ./hub_ose_controller.tar
-
 ```
 
 # Debugging
@@ -57,6 +56,16 @@ If you find your hub_scanner unable to reach the hub server, this most likely me
 ```
 sysctl -w net.ipv4.ip_forward=1
 ```
+
+If during a build you receive an error from ```unzip```, this will come from one of two sources.
+
+## No scan engine
+
+To build, you will need to have a local copy of the Linux scan engine from your Hub server. To obtain the correct version of the scan engine, login to the Hub server. Then click on your name in the upper right corner and select "Tools". Under the Hub Scanner section, you'll find the Linux scanner. Download it and save it to the ```ose-scanner\scanner\hub_scanner``` directory using the file format of ```scan.cli-[dotted-version].zip```. For Hub version 3.4.0, this would become ```scan.cli-3.4.0.zip```.
+
+## Unzip error, but scan engine present
+
+If the scan engine is present, and correctly named, an error during unzip indicates a version mismatch. To resolve, verify the version of your scan engine, and edit the ```Makefile``` for both ```scanner``` and ```controller``` to set the ```BDS_VERSION``` to match the version of your scan engine.
 
 
 
