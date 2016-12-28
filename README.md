@@ -25,6 +25,8 @@ This integration is written primarily in Golang (Go). Go programs are generally 
 Follow these instructions and install Golang on your system. The minimum supported Golang version is 1.6.
 * https://golang.org/doc/install
 
+The build process assumes you have Docker installed. For Linux, install Docker using your local package manager. If you're using a Mac, then you'll want to follow the [Docker for Mac](https://docs.docker.com/engine/installation/mac/) instructions.
+
 Pick a workspace dir for this project. For example ~/work
 Set the GOPATH, then make other directories within it
 
