@@ -9,7 +9,5 @@ _test
 
 # Architecture specific extensions/prefixes
 output/*
-hub_scanner/scan.cli/*
-hub_scanner/*.zip
-build/*
+
 
