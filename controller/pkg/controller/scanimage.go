@@ -55,7 +55,6 @@ func (image ScanImage) scan () (e error){
 
 	fmt.Printf ("Done Scanning: %s\n", image.taggedName)
 
-	//time.Sleep(10*time.Second)
 	return nil
 }
 
