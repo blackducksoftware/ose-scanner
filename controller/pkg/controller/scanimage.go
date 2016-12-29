@@ -18,7 +18,7 @@ func (image ScanImage) scan () (e error){
 	fmt.Printf ("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
 
 	args := []string {}
-	args = append(args, "/oc_scanner")
+	args = append(args, "/ose_scanner")
 
 	args = append(args, "-h")
 	args = append(args, Hub.Host)
