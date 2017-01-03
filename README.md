@@ -27,6 +27,8 @@ Follow these instructions and install Golang on your system. The minimum support
 
 The build process assumes you have Docker installed. For Linux, install Docker using your local package manager. If you're using a Mac, then you'll want to follow the [Docker for Mac](https://docs.docker.com/engine/installation/mac/) instructions.
 
+To build, you will need to have a local copy of the Linux scan engine from your Hub server. To obtain the correct version of the scan engine, login to the Hub server. Then click on your name in the upper right corner and select "Tools". Under the Hub Scanner section, you'll find the Linux scanner. Download it and save it to the ```ose-scanner\scanner\hub_scanner``` directory using the file format of ```scan.cli-[dotted-version].zip```. For Hub version 3.4.0, this would become ```scan.cli-3.4.0.zip```.
+
 Pick a workspace dir for this project. For example ~/work
 Set the GOPATH, then make other directories within it
 
@@ -51,6 +53,23 @@ docker load < ./hub_ose_scanner.tar
 docker load < ./hub_ose_controller.tar
 ```
 
+# Execution
+
+Note: There is a known permissions issue with the ```hub_ose_controller```. Until that is resolved, please use the ```controller``` syntax below.
+
+## Parameters
+
+* scanner 	Specifies the Docker image ID for the ```hub_ose_scanner```. While it is possible to use the Docker name with tag, specifying the image ID is more reliable.
+* h 		Specifies the hostname of the Black Duck Hub instance. 
+* p 		Specifies the port for the Black Duck Hub instance.
+* s 		Specifies the scheme (http/https) for the Black Duck Hub instance
+* u			Specifies the user name for the account in the Black Duck Hub
+* w			Specifies the password for the username
+
+## Controller Syntax
+
+``` ./controller --scanner [id] --h [host] --p 443 --s https --u [user] --w [[password]]
+
 # Debugging
 
 If you find your hub_scanner unable to reach the hub server, this most likely means you're lacking an IPv4 route. Run the following to resolve this:
@@ -59,13 +78,14 @@ If you find your hub_scanner unable to reach the hub server, this most likely me
 sysctl -w net.ipv4.ip_forward=1
 ```
 
+## Unzip errors
 If during a build you receive an error from ```unzip```, this will come from one of two sources.
 
-## No scan engine
+### No scan engine
 
 To build, you will need to have a local copy of the Linux scan engine from your Hub server. To obtain the correct version of the scan engine, login to the Hub server. Then click on your name in the upper right corner and select "Tools". Under the Hub Scanner section, you'll find the Linux scanner. Download it and save it to the ```ose-scanner\scanner\hub_scanner``` directory using the file format of ```scan.cli-[dotted-version].zip```. For Hub version 3.4.0, this would become ```scan.cli-3.4.0.zip```.
 
-## Unzip error, but scan engine present
+### Unzip error, but scan engine present
 
 If the scan engine is present, and correctly named, an error during unzip indicates a version mismatch. To resolve, verify the version of your scan engine, and edit the ```Makefile``` for both ```scanner``` and ```controller``` to set the ```BDS_VERSION``` to match the version of your scan engine.
 
