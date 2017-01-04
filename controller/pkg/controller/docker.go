@@ -60,6 +60,18 @@ func (d Docker) launchContainer (scanner string, args []string) (e error) {
 		return err
 	}
 	
+    options := docker.RemoveContainerOptions {
+        ID:    container.ID,
+        RemoveVolumes : true,
+    }	
+	
+	err = d.client.RemoveContainer( options )
+	
+	if err != nil {
+		fmt.Printf ("Error removing container ID %s: %s\n", d.shortID, err)
+		return err
+	}
+	
 	return nil
 }
 
@@ -74,7 +86,7 @@ func (d Docker) pipeOutput( ID string ) error {
         Stdout:       true,
         Stderr:       true,
         Logs:         true,
-	RawTerminal:  true,
+		RawTerminal:  true,
     }
 
     fmt.Printf("Attaching to IO streams on %s\n", d.shortID)
