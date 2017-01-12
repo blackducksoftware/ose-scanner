@@ -2,8 +2,9 @@ package controller
 
 import (
 	"bufio"
-	"fmt"
+	"log"
 	"io"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -36,29 +37,33 @@ func (d Docker) launchContainer (scanner string, args []string) (e error) {
 	})
 	
 	if err != nil {
-		fmt.Printf ("Error creating container %s: %s\n", scanner, err)
+		log.Printf ("Error creating container %s: %s\n", scanner, err)
 		return err
 	} 
 
 	d.shortID = container.ID[:10]
+	
+	time.Sleep (2 * time.Second)
 
 	d.pipeOutput (container.ID)
 
 	err = d.client.StartContainer (container.ID, &docker.HostConfig {Privileged: true})
 
 	if err != nil {
-		fmt.Printf ("Error starting container ID %s for %s: %s\n", d.shortID, scanner, err)
+		log.Printf ("Error starting container ID %s for %s: %s\n", d.shortID, scanner, err)
 		return err
 	}
 
-	fmt.Printf ("Started scan container %s\n", d.shortID)
+	log.Printf ("Started scan container %s\n", d.shortID)
 
 	exit, err := d.client.WaitContainer (container.ID) // block until done (logs in pipeOutput)
 
 	if err != nil {
-		fmt.Printf ("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
+		log.Printf ("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
 		return err
 	}
+	
+	time.Sleep (5 * time.Second)
 	
     options := docker.RemoveContainerOptions {
         ID:    container.ID,
@@ -68,7 +73,7 @@ func (d Docker) launchContainer (scanner string, args []string) (e error) {
 	err = d.client.RemoveContainer( options )
 	
 	if err != nil {
-		fmt.Printf ("Error removing container ID %s: %s\n", d.shortID, err)
+		log.Printf ("Error removing container ID %s: %s\n", d.shortID, err)
 		return err
 	}
 	
@@ -89,7 +94,7 @@ func (d Docker) pipeOutput( ID string ) error {
 		RawTerminal:  true,
     }
 
-    fmt.Printf("Attaching to IO streams on %s\n", d.shortID)
+    log.Printf("Attaching to IO streams on %s\n", d.shortID)
 
     go d.client.AttachToContainer(options) // will block so isolate
 
@@ -97,11 +102,11 @@ func (d Docker) pipeOutput( ID string ) error {
         scanner := bufio.NewScanner(reader)
 
         for scanner.Scan() {
-            fmt.Printf("%s: %s \n", d.shortID, scanner.Text())
+            log.Printf("%s: %s \n", d.shortID, scanner.Text())
         }
 
         if err := scanner.Err(); err != nil {
-            fmt.Printf("Scanner error on %s: %s\n", d.shortID, err)
+            log.Printf("Scanner error on %s: %s\n", d.shortID, err)
         }
 
     } (r)
@@ -113,7 +118,7 @@ func NewDocker() Docker {
 	endpoint := "unix:///var/run/docker.sock"
 	client, err := docker.NewClient(endpoint)
 	if err != nil {
-        	fmt.Printf("Error connecting to docker engine %s\n", err)
+        	log.Printf("Error connecting to docker engine %s\n", err)
     	}
 
 	return Docker {

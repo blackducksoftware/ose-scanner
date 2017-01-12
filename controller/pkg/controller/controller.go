@@ -1,8 +1,8 @@
 package controller
 
 import (
-	"fmt"
-	"strings"
+	"log"
+	"os"
 	"sync"
 
 	osclient "github.com/openshift/origin/pkg/client"
@@ -13,8 +13,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	//"k8s.io/kubernetes/pkg/util/wait"
-	//"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -41,6 +39,8 @@ type Controller struct {
 	f               *clientcmd.Factory
 	jobQueue	chan Job
 	wait		sync.WaitGroup
+	images		map[string]*ScanImage
+	sync.RWMutex
 }
 
 func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Controller {
@@ -62,39 +62,75 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		f:               f,
 		jobQueue:	 jobQueue,
 		wait:		 wait,
+		images:		make(map[string]*ScanImage),
 
 	}
 }
 
 func (c *Controller) Start() {
 
-	fmt.Println ("Starting controller")
+	log.Println ("Starting controller ....")
 	dispatcher := NewDispatcher(c.jobQueue, MaxWorker)
 	dispatcher.Run()
 
 	return
 }
 
+func (c* Controller) Watch () {
+
+	log.Println ("Starting watcher ....")
+	watcher := NewWatcher(c.openshiftClient, c)
+	watcher.Run()
+
+
+	return
+
+}
+
 func (c *Controller) Stop() {
 
-	fmt.Println ("Waiting for scan queue to drain before stopping...")
+	log.Println ("Waiting for scan queue to drain before stopping...")
 	c.wait.Wait()
 	
-	fmt.Println("Scan queue empty.")
-	fmt.Println("Controller stopped.")
+	log.Println("Scan queue empty.")
+	log.Println("Controller stopped.")
 	return
 
 }
 
 func (c *Controller) Load(done <-chan struct{}) {
 
-	fmt.Println ("Starting load of existing images ...")
+	log.Println ("Starting load of existing images ...")
 	
 	c.getImages( done )
 
-	fmt.Println ("Done load of existing images.")
+	log.Println ("Done load of existing images.")
 
 	return
+}
+
+func (c *Controller) AddImage (ID string, Reference string) {
+
+		c.Lock()
+		_, ok := c.images[Reference]
+		if (!ok) {
+
+			imageItem := NewScanImage (ID, Reference)
+			
+			c.images[Reference] = imageItem
+
+log.Printf ("Added %s to image map\n", imageItem.digest )
+			job := Job {
+				ScanImage: imageItem,
+				controller: c,	
+			}
+
+			job.Load()
+			c.jobQueue <- job
+
+		}
+		c.Unlock()
+
 }
 
 func (c *Controller) getImages (done <-chan struct{}) {
@@ -102,33 +138,17 @@ func (c *Controller) getImages (done <-chan struct{}) {
 	imageList, err := c.openshiftClient.Images().List(kapi.ListOptions{})
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return 
 	}
 
 	if imageList == nil {
-		fmt.Println("No images")
+		log.Println("No images")
 		return
 	}
 
 	for _, image := range imageList.Items {
-		var imageItem ScanImage
-		imageItem.imageId = image.DockerImageMetadata.ID
-
-		tag := strings.Split(image.DockerImageReference, "@")
-		imageItem.digest = image.DockerImageReference
-		imageItem.taggedName = tag[0]
-
-		//fmt.Printf("ID: %s; tag: %s\n", imageItem.imageId, imageItem.taggedName)
-		
-		job := Job {
-			ScanImage: imageItem,
-			controller: c,	
-		}
-
-		job.Load()
-		c.jobQueue <- job
-
+		c.AddImage (image.DockerImageMetadata.ID, image.DockerImageReference)
 	}
 
 	return 
@@ -150,4 +170,8 @@ func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {
 		return project.Name
 	}
 	return project.Name
+}
+
+func init () {
+	log.SetOutput(os.Stdout)
 }

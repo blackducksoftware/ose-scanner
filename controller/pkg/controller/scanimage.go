@@ -1,21 +1,32 @@
 package controller
 
 import (
-	"fmt"
+	"log"
+	"strings"
 )
 
 type ScanImage struct {
 	imageId		string
 	taggedName 	string
 	digest		string
+	scanned		bool
 }
 
+func NewScanImage (ID string, Reference string) *ScanImage  {
+
+	tag := strings.Split(Reference, "@")
+
+	return &ScanImage {
+		imageId: ID,
+		taggedName: tag[0],
+		digest: Reference,
+		scanned: false,
+	}
+}
 
 func (image ScanImage) scan () (e error){
 
-	//cmd := fmt.Sprintf ("docker run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock --privileged %s /ose_scanner -h %s -p %s -s %s -u %s -w %s -id %s -tag %s", Hub.Scanner, Hub.Host, Hub.Port, Hub.Scheme, Hub.Username, Hub.Password, image.imageId, image.taggedName)
-
-	fmt.Printf ("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+	log.Printf ("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
 
 	args := []string {}
 	args = append(args, "/ose_scanner")
@@ -49,11 +60,14 @@ func (image ScanImage) scan () (e error){
 	err := docker.launchContainer (Hub.Scanner, args)
 
 	if err != nil {
-		fmt.Printf ("Error creating scanning container: %s\n", err)
+		log.Printf ("Error creating scanning container: %s\n", err)
 		return err
 	}
+	
 
-	fmt.Printf ("Done Scanning: %s\n", image.taggedName)
+	log.Printf ("Done Scanning: %s\n", image.taggedName)
+
+	image.scanned = true
 
 	return nil
 }

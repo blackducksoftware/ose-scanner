@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
@@ -44,12 +43,15 @@ func main() {
 	c.Start()
 
 	c.Load(done)
+
+	c.Watch()
 	
 	c.Stop()
 
 }
 
 func init() {
+	log.SetOutput(os.Stdout)
 	pflag.StringVar(&hub.Host, "h", "REQUIRED", "The hostname of the Black Duck Hub server.")
 	pflag.StringVar(&hub.Port, "p", "REQUIRED", "The port the Hub is communicating on")
 	pflag.StringVar(&hub.Scheme, "s", "REQUIRED", "The communication scheme [http,https].")
@@ -62,37 +64,37 @@ func checkExpectedCmdlineParams() bool {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
 	if hub.Host == "REQUIRED" {
-		fmt.Println("-h host is required\n")
+		log.Println("-h host is required\n")
 		pflag.PrintDefaults()
 		return false
 	} 
 	
 	if hub.Port == "REQUIRED" {
-		fmt.Println("-p port is required\n")
+		log.Println("-p port is required\n")
 		pflag.PrintDefaults()
 		return false
 	} 
 	
 	if hub.Scheme == "REQUIRED" {
-		fmt.Println("-s scheme is required\n")
+		log.Println("-s scheme is required\n")
 		pflag.PrintDefaults()
 		return false
 	} 
 	
 	if hub.Username == "REQUIRED" {
-		fmt.Println("-u username is required\n")
+		log.Println("-u username is required\n")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Password == "REQUIRED" {
-		fmt.Println("-w password is required\n")
+		log.Println("-w password is required\n")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Scanner == "REQUIRED" {
-		fmt.Println("-scanner Hub scanner image is required\n")
+		log.Println("-scanner Hub scanner image is required\n")
 		pflag.PrintDefaults()
 		return false
 	}

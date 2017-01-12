@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"fmt"
+	"log"
 )
 
 type Worker struct {
@@ -21,7 +21,7 @@ func NewWorker (index int, workerPool chan chan Job) Worker {
 }
 
 func (w Worker) Start() {
-	fmt.Printf ("Starting worker %d\n", w.id)
+	log.Printf ("Starting worker %d\n", w.id)
 	
 	go func() {
 		for {
@@ -30,13 +30,13 @@ func (w Worker) Start() {
 			select {
 				case job := <-w.jobQueue:
 					if err := job.ScanImage.scan(); err != nil {
-						fmt.Printf("Error scanning image: %s", err.Error())
+						log.Printf("Error scanning image: %s", err.Error())
 					}
 					job.Done()
 
 				case <-w.quit:
 					// we have received a signal to stop
-					fmt.Printf ("Aborting worker %d\n", w.id)
+					log.Printf ("Aborting worker %d\n", w.id)
 					return
 			}
 		}

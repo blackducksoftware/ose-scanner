@@ -1,11 +1,11 @@
 package controller
 
 import (
-	"fmt"
+	"log"
 )
 
 type Job struct {
-	ScanImage 	ScanImage
+	ScanImage 	*ScanImage
 	controller	*Controller
 }
 
@@ -17,7 +17,7 @@ func (job Job) Done() {
 
 func (job Job) Load() {
 	job.controller.wait.Add(1)
-	fmt.Println ("Queue image: " + job.ScanImage.taggedName)
+	log.Println ("Queue image: " + job.ScanImage.taggedName)
 	return
 }
 
