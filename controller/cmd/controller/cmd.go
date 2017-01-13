@@ -89,43 +89,43 @@ func checkExpectedCmdlineParams() bool {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
 	if hub.Host == "REQUIRED" {
-		log.Println("-h host is required\n")
+		log.Println("-h host is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Port == "REQUIRED" {
-		log.Println("-p port is required\n")
+		log.Println("-p port is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Scheme == "REQUIRED" {
-		log.Println("-s scheme is required\n")
+		log.Println("-s scheme is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Username == "REQUIRED" {
-		log.Println("-u username is required\n")
+		log.Println("-u username is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Password == "REQUIRED" {
-		log.Println("-w password is required\n")
+		log.Println("-w password is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Scanner == "REQUIRED" {
-		log.Println("-scanner Hub scanner image is required\n")
+		log.Println("-scanner Hub scanner image is required")
 		pflag.PrintDefaults()
 		return false
 	}
 
 	if hub.Workers < 1 {
-		log.Printf("Setting workers from %d to %d\n", hub.Workers)
+		log.Printf("Setting workers from %d to %d\n", hub.Workers, controller.MaxWorkers)
 		hub.Workers = controller.MaxWorkers
 	}
 

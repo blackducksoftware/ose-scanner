@@ -44,6 +44,9 @@ cd ose-scanner
 make
 ```
 
+# Contributing
+When contributing to this project, please ensure that all changes have been verified using ```govet``` and formatted per ```gofmt```.
+
 # Installation
 
 To install the components of this integration, build them and then copy the contents of the ```output``` directory to your OpenShift cluster manager. Then import the containers on the OpenShift master node.

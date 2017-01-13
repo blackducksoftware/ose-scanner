@@ -249,49 +249,49 @@ func checkExpectedCmdlineParams() bool {
 	// These checks seem a little odd, I'd expect the flag parsing to be
 	// able to handle most of this...
 	if in.host == "REQUIRED" {
-		fmt.Println("-h host is required\n")
+		fmt.Println("-h host is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.port == "REQUIRED" {
-		fmt.Println("-p port is required\n")
+		fmt.Println("-p port is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.scheme == "REQUIRED" {
-		fmt.Println("-s scheme is required\n")
+		fmt.Println("-s scheme is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.username == "REQUIRED" {
-		fmt.Println("-u username is required\n")
+		fmt.Println("-u username is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.password == "REQUIRED" {
-		fmt.Println("-w password is required\n")
+		fmt.Println("-w password is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.imageId == "REQUIRED" {
-		fmt.Println("-id image ID is required\n")
+		fmt.Println("-id image ID is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.taggedImage == "REQUIRED" {
-		fmt.Println("-tag Image tag is required\n")
+		fmt.Println("-tag Image tag is required")
 		flag.PrintDefaults()
 		return false
 	}
 
 	if in.digest == "REQUIRED" {
-		fmt.Println("-digest Image digest is required\n")
+		fmt.Println("-digest Image digest is required")
 		flag.PrintDefaults()
 		return false
 	}
@@ -339,7 +339,8 @@ func main() {
 
 	f, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		log.Fatal("ERROR : can't create logfile.\n %v\n", err)
+		msg := fmt.Sprintf("ERROR : can't create logfile.\n %v\n", err)
+		log.Fatal(msg)
 	}
 
 	defer f.Close()
