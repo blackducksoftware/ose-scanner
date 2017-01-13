@@ -65,10 +65,11 @@ Note: There is a known permissions issue with the ```hub_ose_controller```. Unti
 * s 		Specifies the scheme (http/https) for the Black Duck Hub instance
 * u			Specifies the user name for the account in the Black Duck Hub
 * w			Specifies the password for the username
+* workers	Specifies the number of concurrent Hub scanners. If not specified, the controller will start up to five scanners.
 
 ## Controller Syntax
 
-``` ./controller --scanner [id] --h [host] --p 443 --s https --u [user] --w [[password]]
+``` ./controller --scanner [id] --h [host] --p 443 --s https --u [user] --w [[password]] --workers 2
 
 # Debugging
 
@@ -82,12 +83,14 @@ sysctl -w net.ipv4.ip_forward=1
 If during a build you receive an error from ```unzip```, this will come from one of two sources.
 
 ### No scan engine
-
 To build, you will need to have a local copy of the Linux scan engine from your Hub server. To obtain the correct version of the scan engine, login to the Hub server. Then click on your name in the upper right corner and select "Tools". Under the Hub Scanner section, you'll find the Linux scanner. Download it and save it to the ```ose-scanner\scanner\hub_scanner``` directory using the file format of ```scan.cli-[dotted-version].zip```. For Hub version 3.4.0, this would become ```scan.cli-3.4.0.zip```.
 
 ### Unzip error, but scan engine present
-
 If the scan engine is present, and correctly named, an error during unzip indicates a version mismatch. To resolve, verify the version of your scan engine, and edit the ```Makefile``` for both ```scanner``` and ```controller``` to set the ```BDS_VERSION``` to match the version of your scan engine.
+
+## Code location stuck "In Progress" or no files present for a project
+If a code location is stuck in progress, you will see no files for the project. One observed scenario is if the OpenShift cluster manager has insufficient free memory and OOM killer runs on a Hub scanner. In such a situation, the initial data for the project may have been uploaded, but the file contents were never transmitted due to the container being killed prior to completion. To verify this situation, look in the controller log for a message of ```signal killed```.
+
 
 
 

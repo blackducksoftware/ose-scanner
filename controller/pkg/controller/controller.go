@@ -27,6 +27,7 @@ type HubParams struct {
 	Username string
 	Password string
 	Scanner  string
+	Workers		int
 }
 
 var Hub HubParams
@@ -50,7 +51,7 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 
 	Hub = hub
 
-	jobQueue := make(chan Job, MaxQueue)
+	jobQueue := make(chan Job, Hub.Workers)
 
 	var wait sync.WaitGroup
 
@@ -70,7 +71,7 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 func (c *Controller) Start() {
 
 	log.Println ("Starting controller ....")
-	dispatcher := NewDispatcher(c.jobQueue, MaxWorker)
+	dispatcher := NewDispatcher(c.jobQueue, Hub.Workers)
 	dispatcher.Run()
 
 	return
@@ -173,5 +174,6 @@ func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {
 }
 
 func init () {
+	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 }

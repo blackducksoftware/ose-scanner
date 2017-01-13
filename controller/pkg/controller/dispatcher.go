@@ -1,11 +1,6 @@
 package controller
 
-const numScanners = 5
-
-var (
-	MaxWorker = numScanners
-	MaxQueue  = numScanners
-)
+const MaxWorkers = 5
 
 type Dispatcher struct {
 	// A pool of workers channels that are registered with the dispatcher

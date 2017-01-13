@@ -51,13 +51,16 @@ func main() {
 }
 
 func init() {
+	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
+
 	pflag.StringVar(&hub.Host, "h", "REQUIRED", "The hostname of the Black Duck Hub server.")
 	pflag.StringVar(&hub.Port, "p", "REQUIRED", "The port the Hub is communicating on")
 	pflag.StringVar(&hub.Scheme, "s", "REQUIRED", "The communication scheme [http,https].")
 	pflag.StringVar(&hub.Username, "u", "REQUIRED", "The Black Duck Hub user")
 	pflag.StringVar(&hub.Password, "w", "REQUIRED", "Password for the user.")
 	pflag.StringVar(&hub.Scanner, "scanner", "REQUIRED", "Scanner image")
+	pflag.IntVar(&hub.Workers, "workers", controller.MaxWorkers, "Number of container workers")
 }
 
 func checkExpectedCmdlineParams() bool {
@@ -97,6 +100,11 @@ func checkExpectedCmdlineParams() bool {
 		log.Println("-scanner Hub scanner image is required\n")
 		pflag.PrintDefaults()
 		return false
+	}
+
+	if hub.Workers < 1 {
+		log.Printf("Setting workers from %d to %d\n", hub.Workers)
+		hub.Workers = controller.MaxWorkers
 	}
 
 	return true

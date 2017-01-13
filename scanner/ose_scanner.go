@@ -72,7 +72,7 @@ func scanImage(path string, imageId string, taggedImage string) {
 	
 
 	cmd := exec.Command("java",
-		"-Xms256m",
+		"-Xms512m",
 		"-Xmx4096m",
 		"-Done-jar.silent=true",
 		"-Done-jar.jar.path=" + scanCliImplJarPath,

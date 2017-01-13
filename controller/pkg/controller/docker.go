@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"log"
 	"io"
-	"time"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -43,7 +42,7 @@ func (d Docker) launchContainer (scanner string, args []string) (e error) {
 
 	d.shortID = container.ID[:10]
 	
-	time.Sleep (2 * time.Second)
+	//time.Sleep (2 * time.Second)
 
 	d.pipeOutput (container.ID)
 
@@ -61,9 +60,11 @@ func (d Docker) launchContainer (scanner string, args []string) (e error) {
 	if err != nil {
 		log.Printf ("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
 		return err
+	} else {
+		log.Printf ("Scan container %s exit with status %d\n", d.shortID, exit)
 	}
 	
-	time.Sleep (5 * time.Second)
+	//time.Sleep (5 * time.Second)
 	
     options := docker.RemoveContainerOptions {
         ID:    container.ID,
