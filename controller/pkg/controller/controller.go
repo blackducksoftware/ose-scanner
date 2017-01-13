@@ -1,3 +1,25 @@
+/*
+Copyright (C) 2016 Black Duck Software, Inc.
+http://www.blackducksoftware.com/
+
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements. See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership. The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied. See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 package controller
 
 import (
@@ -27,7 +49,7 @@ type HubParams struct {
 	Username string
 	Password string
 	Scanner  string
-	Workers		int
+	Workers  int
 }
 
 var Hub HubParams
@@ -38,9 +60,9 @@ type Controller struct {
 	mapper          meta.RESTMapper
 	typer           runtime.ObjectTyper
 	f               *clientcmd.Factory
-	jobQueue	chan Job
-	wait		sync.WaitGroup
-	images		map[string]*ScanImage
+	jobQueue        chan Job
+	wait            sync.WaitGroup
+	images          map[string]*ScanImage
 	sync.RWMutex
 }
 
@@ -61,28 +83,26 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		mapper:          mapper,
 		typer:           typer,
 		f:               f,
-		jobQueue:	 jobQueue,
-		wait:		 wait,
-		images:		make(map[string]*ScanImage),
-
+		jobQueue:        jobQueue,
+		wait:            wait,
+		images:          make(map[string]*ScanImage),
 	}
 }
 
 func (c *Controller) Start() {
 
-	log.Println ("Starting controller ....")
+	log.Println("Starting controller ....")
 	dispatcher := NewDispatcher(c.jobQueue, Hub.Workers)
 	dispatcher.Run()
 
 	return
 }
 
-func (c* Controller) Watch () {
+func (c *Controller) Watch() {
 
-	log.Println ("Starting watcher ....")
+	log.Println("Starting watcher ....")
 	watcher := NewWatcher(c.openshiftClient, c)
 	watcher.Run()
-
 
 	return
 
@@ -90,9 +110,9 @@ func (c* Controller) Watch () {
 
 func (c *Controller) Stop() {
 
-	log.Println ("Waiting for scan queue to drain before stopping...")
+	log.Println("Waiting for scan queue to drain before stopping...")
 	c.wait.Wait()
-	
+
 	log.Println("Scan queue empty.")
 	log.Println("Controller stopped.")
 	return
@@ -101,46 +121,46 @@ func (c *Controller) Stop() {
 
 func (c *Controller) Load(done <-chan struct{}) {
 
-	log.Println ("Starting load of existing images ...")
-	
-	c.getImages( done )
+	log.Println("Starting load of existing images ...")
 
-	log.Println ("Done load of existing images.")
+	c.getImages(done)
+
+	log.Println("Done load of existing images.")
 
 	return
 }
 
-func (c *Controller) AddImage (ID string, Reference string) {
+func (c *Controller) AddImage(ID string, Reference string) {
 
-		c.Lock()
-		_, ok := c.images[Reference]
-		if (!ok) {
+	c.Lock()
+	_, ok := c.images[Reference]
+	if !ok {
 
-			imageItem := NewScanImage (ID, Reference)
-			
-			c.images[Reference] = imageItem
+		imageItem := NewScanImage(ID, Reference)
 
-log.Printf ("Added %s to image map\n", imageItem.digest )
-			job := Job {
-				ScanImage: imageItem,
-				controller: c,	
-			}
+		c.images[Reference] = imageItem
 
-			job.Load()
-			c.jobQueue <- job
-
+		log.Printf("Added %s to image map\n", imageItem.digest)
+		job := Job{
+			ScanImage:  imageItem,
+			controller: c,
 		}
-		c.Unlock()
+
+		job.Load()
+		c.jobQueue <- job
+
+	}
+	c.Unlock()
 
 }
 
-func (c *Controller) getImages (done <-chan struct{}) {
+func (c *Controller) getImages(done <-chan struct{}) {
 
 	imageList, err := c.openshiftClient.Images().List(kapi.ListOptions{})
 
 	if err != nil {
 		log.Println(err)
-		return 
+		return
 	}
 
 	if imageList == nil {
@@ -149,19 +169,18 @@ func (c *Controller) getImages (done <-chan struct{}) {
 	}
 
 	for _, image := range imageList.Items {
-		c.AddImage (image.DockerImageMetadata.ID, image.DockerImageReference)
+		c.AddImage(image.DockerImageMetadata.ID, image.DockerImageReference)
 	}
 
-	return 
+	return
 
 }
-
 
 // DisplayNameAndNameForProject returns a formatted string containing the name
 // of the project and includes the display name if it differs.
 func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {
 	displayName := project.Annotations[displayNameAnnotation]
-	
+
 	if len(displayName) == 0 {
 		displayName = project.Annotations[displayNameOldAnnotation]
 	}
@@ -173,7 +192,7 @@ func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {
 	return project.Name
 }
 
-func init () {
+func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 }

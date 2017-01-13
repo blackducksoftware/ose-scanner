@@ -1,40 +1,61 @@
+/*
+Copyright (C) 2016 Black Duck Software, Inc.
+http://www.blackducksoftware.com/
+
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements. See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership. The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied. See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 package main
 
 import (
-	"fmt"
-	"os"
 	"bytes"
+	"errors"
+	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"strings"
-	"errors"
-	"flag"
+	"os"
 	"os/exec"
 	"path/filepath"
-
+	"strings"
 )
 
 const (
-	APP_VERSION = "0.1"
-	DEFAULT_BDS_SCANNER_BASE_DIR = "/tmp/bds-scanner"
-	CLI_IMPL_JAR_FILE_NAME = "scan.cli.impl-standalone.jar"
-	BDS_SCANNER_BASE_DIR_VAR_NAME="SCANNER_BASE_DIR"
-	SCAN_CLI_JAR_NAME_VAR_NAME="SCAN_CLI_JAR_NAME"
-	APP_HOME_VAR_NAME="APP_HOME"
+	APP_VERSION                   = "0.1"
+	DEFAULT_BDS_SCANNER_BASE_DIR  = "/tmp/bds-scanner"
+	CLI_IMPL_JAR_FILE_NAME        = "scan.cli.impl-standalone.jar"
+	BDS_SCANNER_BASE_DIR_VAR_NAME = "SCANNER_BASE_DIR"
+	SCAN_CLI_JAR_NAME_VAR_NAME    = "SCAN_CLI_JAR_NAME"
+	APP_HOME_VAR_NAME             = "APP_HOME"
 )
 
 type input struct {
-	host     string
-	port     string
-	scheme   string
-	username string
-	password string
-	imageId  string
+	host        string
+	port        string
+	scheme      string
+	username    string
+	password    string
+	imageId     string
 	taggedImage string
-	digest   string
+	digest      string
 }
 
 var in input
@@ -52,7 +73,7 @@ func init() {
 
 // The flag package provides a default help printer via -h switch
 var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
-var dumpFlag    *bool = flag.Bool("d", false, "dumps extracted tar in /tmp.")
+var dumpFlag *bool = flag.Bool("d", false, "dumps extracted tar in /tmp.")
 
 func scanImage(path string, imageId string, taggedImage string) {
 
@@ -65,17 +86,16 @@ func scanImage(path string, imageId string, taggedImage string) {
 	scanCliJarName := os.Getenv(SCAN_CLI_JAR_NAME_VAR_NAME)
 	scanCliImplJarPath := filepath.Join(appHomeDir, "lib", "cache", CLI_IMPL_JAR_FILE_NAME)
 	scanCliJarPath := filepath.Join(appHomeDir, "lib", scanCliJarName)
-	
+
 	log.Println("Processing project " + project + " with version " + prefix)
 	log.Printf("Scan CLI Impl Jar: %s\n", scanCliImplJarPath)
 	log.Printf("Scan CLI Jar: %s\n", scanCliJarPath)
-	
 
 	cmd := exec.Command("java",
 		"-Xms512m",
 		"-Xmx4096m",
 		"-Done-jar.silent=true",
-		"-Done-jar.jar.path=" + scanCliImplJarPath,
+		"-Done-jar.jar.path="+scanCliImplJarPath,
 		"-jar", scanCliJarPath,
 		"--host", in.host,
 		"--port", in.port,
@@ -100,34 +120,34 @@ func scanImage(path string, imageId string, taggedImage string) {
 }
 
 func writeContents(body io.ReadCloser, path string) (tarFilePath string, err error) {
-	
+
 	defer func() {
 		body.Close()
 	}()
-	
+
 	log.Println("Starting to write file contents to a tar file.")
-	
+
 	tarFilePath = fmt.Sprintf("%s.%s", path, "tar")
 	log.Printf("Tar File Path: %s\n", tarFilePath)
-		
+
 	f, err := os.OpenFile(tarFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		fmt.Println("ERROR : opening file.")
 		fmt.Println(err)
 		return "", err
 	}
-				
+
 	if _, err := io.Copy(f, body); err != nil {
 		fmt.Println("ERROR : copying into file.")
 		fmt.Println(err)
 		return "", err
 	}
-	
+
 	return tarFilePath, nil
 }
 
 func getHttpRequestResponse(client *httputil.ClientConn, httpMethod string, requestUrl string) (resp *http.Response, err error) {
-	
+
 	log.Printf("Making request: [%s] [%s]\n", httpMethod, requestUrl)
 	req, err := http.NewRequest(httpMethod, requestUrl, nil)
 
@@ -143,36 +163,35 @@ func getHttpRequestResponse(client *httputil.ClientConn, httpMethod string, requ
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.New(fmt.Sprintf("received status != 200 on resp OK: %s", resp.Status))
 	}
-	
+
 	return resp, nil
 }
 
-func saveImageToTar(client *httputil.ClientConn, image string, path string)  (tarFilePath string, err error) {
-	
+func saveImageToTar(client *httputil.ClientConn, image string, path string) (tarFilePath string, err error) {
 
-	exists, err := imageExists (client, image)
+	exists, err := imageExists(client, image)
 	if err != nil {
 		return "", err
 	}
 
 	if !exists {
 		return "", nil
-	} 
+	}
 
 	os.MkdirAll(path, 0755)
 	imageUrl := fmt.Sprintf("/images/%s/get", image)
 	resp, err := getHttpRequestResponse(client, "GET", imageUrl)
-	
+
 	if err != nil {
 		return "", err
 	}
- 
+
 	return writeContents(resp.Body, path)
 
 }
 
-func imageExists(client *httputil.ClientConn, image string)  (result bool, err error) {
-	
+func imageExists(client *httputil.ClientConn, image string) (result bool, err error) {
+
 	imageUrl := fmt.Sprintf("/images/%s/history", image)
 	resp, err := getHttpRequestResponse(client, "GET", imageUrl)
 
@@ -195,30 +214,29 @@ func imageExists(client *httputil.ClientConn, image string)  (result bool, err e
 
 func getScannerOutputDir() string {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
-	
+
 	// Get hostname to use as part of the output path
 	hostname, err := os.Hostname()
 	if err != nil {
 		fmt.Printf("ERROR: getting hostname %s\n", err)
 		hostname = "default-host"
 	}
-	
+
 	// Check to see if we can get the env var for the base dir (we should always be able to)
 	bdsScannerBaseDir := os.Getenv(BDS_SCANNER_BASE_DIR_VAR_NAME)
-	
+
 	// If for some reason we can't, make up a default, since this doesn't have any outside dependencies
 	if bdsScannerBaseDir == "" {
 		bdsScannerBaseDir = DEFAULT_BDS_SCANNER_BASE_DIR
 	}
 
 	// Make base out dir for any scanner output, scans, etc...
-	scannerOutputDir := filepath.Join(bdsScannerBaseDir, hostname) 
-	os.MkdirAll(scannerOutputDir, os.ModeDir | os.ModePerm)
+	scannerOutputDir := filepath.Join(bdsScannerBaseDir, hostname)
+	os.MkdirAll(scannerOutputDir, os.ModeDir|os.ModePerm)
 
 	fmt.Printf("Scanner Output Dir: %s\n", scannerOutputDir)
 	return scannerOutputDir
 }
-
 
 func checkExpectedCmdlineParams() bool {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
@@ -228,26 +246,26 @@ func checkExpectedCmdlineParams() bool {
 		return false
 	}
 
-    // These checks seem a little odd, I'd expect the flag parsing to be
+	// These checks seem a little odd, I'd expect the flag parsing to be
 	// able to handle most of this...
 	if in.host == "REQUIRED" {
 		fmt.Println("-h host is required\n")
 		flag.PrintDefaults()
 		return false
-	} 
-	
+	}
+
 	if in.port == "REQUIRED" {
 		fmt.Println("-p port is required\n")
 		flag.PrintDefaults()
 		return false
-	} 
-	
+	}
+
 	if in.scheme == "REQUIRED" {
 		fmt.Println("-s scheme is required\n")
 		flag.PrintDefaults()
 		return false
-	} 
-	
+	}
+
 	if in.username == "REQUIRED" {
 		fmt.Println("-u username is required\n")
 		flag.PrintDefaults()
@@ -287,34 +305,34 @@ func checkExpectedEnvVars() bool {
 	appHomeDir := os.Getenv(APP_HOME_VAR_NAME)
 	scanCliJarName := os.Getenv(SCAN_CLI_JAR_NAME_VAR_NAME)
 	errorMsgFmt := "%s env var is required to be set.\n"
-	
+
 	if appHomeDir == "" {
 		fmt.Printf(errorMsgFmt, APP_HOME_VAR_NAME)
 		return false
 	}
-	
+
 	if scanCliJarName == "" {
 		fmt.Printf(errorMsgFmt, SCAN_CLI_JAR_NAME_VAR_NAME)
 		return false
 	}
-	
+
 	return true
 }
 
 func main() {
 	// check input arguments
 	flag.Parse() // Scan the arguments list
-	
+
 	if !checkExpectedCmdlineParams() {
 		return
 	}
-	
+
 	if !checkExpectedEnvVars() {
 		return
 	}
-	
-	scannerOutputDir := getScannerOutputDir()	
-	
+
+	scannerOutputDir := getScannerOutputDir()
+
 	// Route the log to a file
 	logFile := fmt.Sprintf("%s/%s.log", scannerOutputDir, os.Args[0])
 	fmt.Printf("Log File: %s\n", logFile)
@@ -323,7 +341,7 @@ func main() {
 	if err != nil {
 		log.Fatal("ERROR : can't create logfile.\n %v\n", err)
 	}
-	
+
 	defer f.Close()
 	log.SetOutput(io.MultiWriter(os.Stdout, f))
 
@@ -351,7 +369,7 @@ func main() {
 		log.Printf("WARNING : image : %s won't be scanned.", image)
 	} else {
 		newTarPath, err := saveImageToTar(client, digest, path)
-		
+
 		if err != nil {
 			log.Printf("Error while making tar file: %s\n", err)
 		} else {
@@ -359,9 +377,9 @@ func main() {
 		}
 
 		if !*dumpFlag {
-		   os.RemoveAll(path)
+			os.RemoveAll(path)
 		}
 	}
-		
+
 	log.Println("Finished")
 }
