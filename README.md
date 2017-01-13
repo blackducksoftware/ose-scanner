@@ -46,7 +46,7 @@ make
 
 # Installation
 
-To install the components of this integration, build them and then copy the contents of the ```output``` directory to your OpenShift cluster manager. Then import the containers.
+To install the components of this integration, build them and then copy the contents of the ```output``` directory to your OpenShift cluster manager. Then import the containers on the OpenShift master node.
 
 ```
 docker load < ./hub_ose_scanner.tar
@@ -68,16 +68,23 @@ Note: There is a known permissions issue with the ```hub_ose_controller```. Unti
 * workers	Specifies the number of concurrent Hub scanners. If not specified, the controller will start up to five scanners.
 
 ## Controller Syntax
+The controller is run on the OpenShift master node, and requires you to login to OpenShift first.
 
 ``` ./controller --scanner [id] --h [host] --p 443 --s https --u [user] --w [[password]] --workers 2
 
+# Tested environments
+Testing has been performed using Hub versions 3.4.0 and 3.4.3 and the Red Hat OpenShift Container Development Kit for OpenShift 3.2. 
+
 # Debugging
 
-If you find your hub_scanner unable to reach the hub server, this most likely means you're lacking an IPv4 route. Run the following to resolve this:
-
+## Unable to reach Hub server
+If you find your hub_ose_scanner unable to reach the hub server, this most likely means you're lacking an IPv4 route. Run the following to resolve this:
 ```
 sysctl -w net.ipv4.ip_forward=1
 ```
+
+## No images imported
+If no images are imported, and no obvious errors in the controller logs, then your OpenShift credentials have expired. Stop the controller, login, and restart the controller.
 
 ## Unzip errors
 If during a build you receive an error from ```unzip```, this will come from one of two sources.
