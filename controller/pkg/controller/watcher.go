@@ -98,7 +98,12 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 	digest := is.Spec.DockerImageRepository
 
 	for _, events := range tags {
-		ref := events.Items[0].Image
+		tagEvents := events.Items
+		if len(tagEvents) == 0 {
+			log.Printf("ImageStream %s has no associated image\n", digest)
+			return
+		}
+		ref := tagEvents[0].Image
 		image, err := w.openshiftClient.Images().Get(ref)
 		if err != nil {
 			log.Printf("Error seeking new image %s@%s: %s\n", digest, ref, err)
@@ -119,7 +124,12 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 	digest := is.Spec.DockerImageRepository
 
 	for _, events := range tags {
-		ref := events.Items[0].Image
+		tagEvents := events.Items
+		if len(tagEvents) == 0 {
+			log.Printf("ImageStream %s has no associated image\n", digest)
+			return
+		}
+		ref := tagEvents[0].Image
 		image, err := w.openshiftClient.Images().Get(ref)
 		if err != nil {
 			log.Printf("Error seeking updated image %s@%s: %s\n", digest, ref, err)
