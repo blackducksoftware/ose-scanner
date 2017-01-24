@@ -7,7 +7,7 @@ The ose-scanner provides integration between Black Duck Hub and OpenShift v3. Th
 
 ## Documentation
 
-All documentation for ose-scanner can be found on the base project: https://github.com/blackducksoftware/ose-scanner/wiki/OSE-Scanner
+All documentation, including compilation, installation and debugging instructions can be found on the [wiki](https://github.com/blackducksoftware/ose-scanner/wiki)
 
 ## License
 
