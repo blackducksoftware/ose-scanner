@@ -43,11 +43,12 @@ const (
 )
 
 type HubParams struct {
-	Host     string
-	Port     string
-	Scheme   string
-	Username string
-	Password string
+	//Host     string
+	//Port     string
+	//Scheme   string
+	//Username string
+	//Password string
+	Config *HubConfig
 	Scanner  string
 	Workers  int
 }
@@ -173,6 +174,14 @@ func (c *Controller) getImages(done <-chan struct{}) {
 	}
 
 	return
+
+}
+
+func (c *Controller) ValidateConfig () bool {
+
+	hubServer := HubServer{Config: Hub.Config}
+	
+	return hubServer.login()
 
 }
 

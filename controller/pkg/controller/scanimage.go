@@ -54,19 +54,19 @@ func (image ScanImage) scan() (e error) {
 	args = append(args, "/ose_scanner")
 
 	args = append(args, "-h")
-	args = append(args, Hub.Host)
+	args = append(args, Hub.Config.Host)
 
 	args = append(args, "-p")
-	args = append(args, Hub.Port)
+	args = append(args, Hub.Config.Port)
 
 	args = append(args, "-s")
-	args = append(args, Hub.Scheme)
+	args = append(args, Hub.Config.Scheme)
 
 	args = append(args, "-u")
-	args = append(args, Hub.Username)
+	args = append(args, Hub.Config.User)
 
 	args = append(args, "-w")
-	args = append(args, Hub.Password)
+	args = append(args, Hub.Config.Password)
 
 	args = append(args, "-id")
 	args = append(args, image.imageId)
