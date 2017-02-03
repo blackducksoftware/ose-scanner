@@ -23,8 +23,11 @@ under the License.
 package controller
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 type ScanImage struct {
@@ -79,16 +82,101 @@ func (image ScanImage) scan() (e error) {
 
 	docker := NewDocker()
 
-	err := docker.launchContainer(Hub.Scanner, args)
+	goodScan, err := docker.launchContainer(Hub.Scanner, args)
 
 	if err != nil {
 		log.Printf("Error creating scanning container: %s\n", err)
 		return err
 	}
 
-	log.Printf("Done Scanning: %s\n", image.taggedName)
+	log.Printf("Done Scanning: %s (%s) with result %t\n", image.taggedName, image.imageId[:10], goodScan)
 
 	image.scanned = true
 
+	if goodScan {
+		return image.results()
+	}
+
+	return nil
+}
+
+func (image ScanImage) results() (e error) {
+	log.Printf("Checking for vulnerabilities on: %s\n", image.taggedName)
+
+	hub := HubServer{Config: Hub.Config}
+	if ok := hub.login(); !ok {
+		log.Printf("Hub credentials not valid\n")
+		return errors.New("Invalid Hub credentials")
+	}
+
+	// check if the scan was completed
+	codeLocations := hub.findCodeLocations(image.imageId)
+	if len(codeLocations.Items) == 0 {
+		e := fmt.Sprintf("ERROR no code locations for image: %s", image.imageId)
+		log.Printf("%s\n", e)
+		return errors.New(e)
+	}
+
+	scanSummaryUrl := codeLocations.Items[codeLocations.TotalCount-1].Meta.Links[0].Href
+
+	scanSummaries := hub.findCodeLocationScanSummaries(scanSummaryUrl)
+	if len(scanSummaries.Items) != 1 {
+		e := fmt.Sprintf("ERROR no scan summary for image: %s", image.imageId)
+		log.Printf("%s\n", e)
+		return errors.New(e)
+	}
+
+	for strings.Compare(scanSummaries.Items[0].Status, "COMPLETE") != 0 {
+		time.Sleep(1 * time.Minute)
+		scanSummaries = hub.findCodeLocationScanSummaries(scanSummaryUrl)
+		log.Printf("Scan status: %s\n", scanSummaries.Items[0].Status)
+
+		if strings.Compare(scanSummaries.Items[0].Status, "ERROR") == 0 {
+			e := fmt.Sprintf("ERROR processing scan summaries for image: %s", image.imageId)
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
+	}
+
+	projects := hub.findProjects(image.taggedName)
+	if len(projects.Items) != 1 {
+		e := fmt.Sprintf("ERROR no projects summary for image: %s", image.taggedName)
+		log.Printf("%s\n", e)
+		return errors.New(e)
+	}
+
+	index := strings.LastIndex(projects.Items[0].Meta.Href, "/")
+	projectId := projects.Items[0].Meta.Href[index+1:]
+
+	projectVersions := hub.findProjectVersions(projectId, image.imageId[:10])
+	if len(projectVersions.Items) != 1 {
+		e := fmt.Sprintf("ERROR unable to locate project version for image: %s:%s", image.taggedName, image.imageId[:10])
+		log.Printf("%s\n", e)
+		return errors.New(e)
+	}
+
+	vulnerabilities := 0
+
+	// we have a matching version for our image, need to locate the risk-profile
+	for _, Item := range projectVersions.Items[0].Meta.Links {
+
+		log.Printf("  Processing version link: %s\n", Item.Rel)
+		if strings.Compare(Item.Rel, "riskProfile") == 0 {
+
+			riskProfile := hub.getRiskProfile(Item.Href)
+			if riskProfile == nil {
+				e := fmt.Sprintf("ERROR unable to load risk profile for image: %s:%s", image.taggedName, image.imageId[:10])
+				log.Printf("%s\n", e)
+				return errors.New(e)
+			}
+			vulnerabilities = riskProfile.Categories.VULNERABILITY.HIGH
+
+			break
+		}
+	}
+
+	log.Printf("Found %d high severity vulnerabilities for %s:%s\n", vulnerabilities, image.taggedName, image.imageId[:10])
+
+	//TODO - Hook results into AdmissionController
 	return nil
 }

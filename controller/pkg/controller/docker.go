@@ -24,10 +24,11 @@ package controller
 
 import (
 	"bufio"
+	"github.com/fsouza/go-dockerclient"
 	"io"
 	"log"
-
-	"github.com/fsouza/go-dockerclient"
+	"strings"
+	"time"
 )
 
 type Docker struct {
@@ -35,7 +36,7 @@ type Docker struct {
 	shortID string
 }
 
-func (d Docker) launchContainer(scanner string, args []string) (e error) {
+func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
 
 	binds := []string{}
 	binds = append(binds, "/var/run/docker.sock:/var/run/docker.sock")
@@ -57,20 +58,20 @@ func (d Docker) launchContainer(scanner string, args []string) (e error) {
 
 	if err != nil {
 		log.Printf("Error creating container %s: %s\n", scanner, err)
-		return err
+		return false, err
 	}
 
 	d.shortID = container.ID[:10]
 
-	//time.Sleep (2 * time.Second)
-
-	d.pipeOutput(container.ID)
+	done := make(chan bool)
+	abort := make(chan bool, 1)
+	d.pipeOutput(container.ID, done, abort)
 
 	err = d.client.StartContainer(container.ID, &docker.HostConfig{Privileged: true})
 
 	if err != nil {
 		log.Printf("Error starting container ID %s for %s: %s\n", d.shortID, scanner, err)
-		return err
+		return false, err
 	}
 
 	log.Printf("Started scan container %s\n", d.shortID)
@@ -79,12 +80,10 @@ func (d Docker) launchContainer(scanner string, args []string) (e error) {
 
 	if err != nil {
 		log.Printf("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
-		return err
+		return false, err
 	} else {
 		log.Printf("Scan container %s exit with status %d\n", d.shortID, exit)
 	}
-
-	//time.Sleep (5 * time.Second)
 
 	options := docker.RemoveContainerOptions{
 		ID:            container.ID,
@@ -95,13 +94,17 @@ func (d Docker) launchContainer(scanner string, args []string) (e error) {
 
 	if err != nil {
 		log.Printf("Error removing container ID %s: %s\n", d.shortID, err)
-		return err
+		return false, err
 	}
 
-	return nil
+	abort <- true
+	result := <-done
+	log.Printf("Scan complete of %s with result %t\n", d.shortID, result)
+
+	return result, nil
 }
 
-func (d Docker) pipeOutput(ID string) error {
+func (d Docker) pipeOutput(ID string, done chan bool, abort chan bool) error {
 	r, w := io.Pipe()
 
 	options := docker.AttachToContainerOptions{
@@ -119,18 +122,48 @@ func (d Docker) pipeOutput(ID string) error {
 
 	go d.client.AttachToContainer(options) // will block so isolate
 
-	go func(reader io.Reader) {
+	go func(reader *io.PipeReader, shortID string, a chan bool) {
+
+		for {
+			time.Sleep(time.Second)
+			select {
+			case _ = <-a:
+				log.Printf("Received IO shutdown for scanner %s\n", shortID)
+				reader.Close()
+				return
+
+			default:
+			}
+
+		}
+
+	}(r, d.shortID, abort)
+
+	go func(reader io.Reader, shortID string, c chan bool) {
 		scanner := bufio.NewScanner(reader)
+		scan := false
 
 		for scanner.Scan() {
-			log.Printf("%s: %s \n", d.shortID, scanner.Text())
+			out := scanner.Text()
+			if strings.Contains(out, "Post Scan...") {
+				log.Printf("Found completed scan with result for %s\n", shortID)
+				scan = true
+			}
+			log.Printf("%s: %s\n", shortID, out)
 		}
 
-		if err := scanner.Err(); err != nil {
-			log.Printf("Scanner error on %s: %s\n", d.shortID, err)
-		}
+		/*
+			*** since we exit the loop by closing the reader, an error will occur ***
+			*** Need to look into a better way such that legit errors can be captured ***
+			if err := scanner.Err(); err != nil {
+				log.Printf("Scanner error on %s: %s\n", shortID, err)
+			} */
 
-	}(r)
+		log.Printf("Placing scan result %t into channel for %s\n", scan, shortID)
+		c <- scan
+
+	}(r, d.shortID, done)
+
 	return nil
 }
 

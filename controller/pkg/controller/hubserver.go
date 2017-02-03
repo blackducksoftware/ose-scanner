@@ -19,15 +19,17 @@ KIND, either express or implied. See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-// ***Note*** Minor fork of the Atomic implementation
+
 package controller
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type myjar struct {
@@ -51,145 +53,153 @@ type HubConfig struct {
 	Password string `json:"password"`
 }
 
+type codeLocationsStruct struct {
+	TotalCount int `json:"totalCount"`
+	Items      []struct {
+		Type                 string    `json:"type"`
+		URL                  string    `json:"url"`
+		CreatedAt            time.Time `json:"createdAt"`
+		UpdatedAt            time.Time `json:"updatedAt"`
+		MappedProjectVersion string    `json:"mappedProjectVersion"`
+		Meta                 struct {
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
+	} `json:"items"`
+	Meta struct {
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
+	AppliedFilters []interface{} `json:"appliedFilters"`
+}
+
+type codeLocationsScanSummariesStruct struct {
+	TotalCount int `json:"totalCount"`
+	Items      []struct {
+		Status    string    `json:"status"`
+		CreatedAt time.Time `json:"createdAt"`
+		Meta      struct {
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
+		UpdatedAt time.Time `json:"updatedAt"`
+	} `json:"items"`
+	Meta struct {
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
+	AppliedFilters []interface{} `json:"appliedFilters"`
+}
+
+type projectsStruct struct {
+	TotalCount int `json:"totalCount"`
+	Items      []struct {
+		Name                    string `json:"name"`
+		ProjectLevelAdjustments bool   `json:"projectLevelAdjustments"`
+		Source                  string `json:"source"`
+		Meta                    struct {
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
+	} `json:"items"`
+}
+
+type projectVersionsStruct struct {
+	TotalCount int `json:"totalCount"`
+	Items      []struct {
+		VersionName  string `json:"versionName"`
+		Phase        string `json:"phase"`
+		Distribution string `json:"distribution"`
+		Source       string `json:"source"`
+		Meta         struct {
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
+	} `json:"items"`
+}
+
+type riskProfileStruct struct {
+	Categories struct {
+		VERSION struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"VERSION"`
+		VULNERABILITY struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"VULNERABILITY"`
+		ACTIVITY struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"ACTIVITY"`
+		LICENSE struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"LICENSE"`
+		OPERATIONAL struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"OPERATIONAL"`
+	} `json:"categories"`
+	Meta struct {
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
+}
 
 type HubServer struct {
 	client *http.Client
 	Config *HubConfig
 }
 
-type ranking struct {
-	HIGH    int `json:"HIGH"`
-	MEDIUM  int `json:"MEDIUM"`
-	LOW     int `json:"LOW"`
-	OK      int `json:"OK"`
-	UNKNOWN int `json:"UNKNOWN"`
-}
-
-type vulnerabilityBom struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		ChannelRelease struct {
-			ExternalId                    string `json:"externalId"`
-			ExternalNamespace             string `json:"externalNamespace"`
-			ExternalNamespaceDistribution bool   `json:"externalNamespaceDistribution"`
-			Id                            string `json:"id"`
-			Name                          string `json:"name"`
-		} `json:"channelRelease"`
-		ProducerReleases []struct {
-			Id string `json:"id"`
-		} `json:"producerReleases"`
-	} `json:"items"`
-}
-
-type vulnerability struct {
-	Id                     string `json:"type"`
-	AccessComplexity       string `json:"accessComplexity"`
-	AccessVector           string `json:"accessVector"`
-	ActualAt               string `json:"actualAt"`
-	Authentication         string `json:"authentication"`
-	AutoCreated            bool `json:"autoCreated"`
-	AvailabilityImpact     string `json:"availabilityImpact"`
-	BaseScore              float64 `json:"baseScore"`
-	ExploitabilitySubscore float64 `json:"exploitabilitySubscore"`
-	ImpactSubscore         float64 `json:"impactSubscore"`
-	LastModified           string `json:"lastModified"`
-	PublishedDate          string `json:"publishedDate"`
-	Severity               string `json:"severity"`
-	Solution               string `json:"solution"`
-	Source                 string `json:"source"`
-	Summary                string `json:"summary"`
-	TargetAt               string `json:"targetAt"`
-	TechnicalDescription   string `json:"technicalDescription"`
-	Title                  string `json:"title"`
-	Classifications        []struct {
-		ClassificationId int    `json:"classificationId"`
-		Description      string `json:"description"`
-		Longname         string `json:"longname"`
-		Name             string `json:"name"`
-	} `json:"classifications"`
-	References []struct {
-		Content string `json:"content"`
-		Href    string `json:"href"`
-		Source  string `json:"source"`
-		Type    string `json:"type"`
-	} `json:"references"`
-	RelatedMetrics []struct {
-		AccessComplexity       string `json:"accessComplexity"`
-		AccessVector           string `json:"accessVector"`
-		Authentication         string `json:"authentication"`
-		AvailabilityImpact     string `json:"availabilityImpact"`
-		BaseScore              float64 `json:"baseScore"`
-		ConfidentialityImpact  string `json:"confidentialityImpact"`
-		ExploitabilitySubscore float64 `json:"exploitabilitySubscore"`
-		generatedOn            string `json:"generatedOn"`
-		ImpactSubscore         float64 `json:"impactSubscore"`
-		IntegrityImpact        string `json:"integrityImpact"`
-		Source                 string `json:"source"`
-	} `json:"relatedMetrics"`
-	RelatedVulnerabilities []struct {
-		Id                  string `json:"relatedVulnerabilities"`
-		VulnerabilitySource string `json:"vulnerabilitySource"`
-		VulnerabilityUrl    string `json:"vulnerabilityUrl"`
-	} `json:"relatedVulnerabilities"`
-}
-
-type vulnerabilities struct {
-	TotalCount int             `json:"totalCount"`
-	Items      []vulnerability `json:"items"`
-}
-
-type bomRiskProfile struct {
-	NumberOfItems int `json:"numberOfItems"`
-	Categories    struct {
-		ACTIVITY      ranking `json:"ACTIVITY"`
-		LICENSE       ranking `json:"LICENSE"`
-		OPERATIONAL   ranking `json:"OPERATIONAL"`
-		VERSION       ranking `json:"VERSION"`
-		VULNERABILITY ranking `json:"VULNERABILITY"`
-	} `json:"categories"`
-}
-
-type bomRows struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		Activity struct {
-			ActivityTrend           string `json:"activityTrend"`
-			CommitCount12Month      int    `json:"commitCount12Month"`
-			ContributorCount12Month int    `json:"contributorCount12Month"`
-		} `json:"activity"`
-		ComponentMatchTypes []string `json:"componentMatchTypes"`
-		License             struct {
-			Licenses []struct {
-				Name           string `json:"name"`
-				LicenseDisplay string `json:"licenseDisplay"`
-			} `json:"licenses"`
-		} `json:"license"`
-		MatchTypes      []string `json:"matchTypes"`
-		ProducerProject struct {
-			Name string `json:"name"`
-		} `json:producerProject"`
-		ProducerRelease struct {
-			Version string `json:"version"`
-		} `json:"producerRelease"`
-		RiskProfile bomRiskProfile `json:"riskProfile"`
-		VersionRisk struct {
-			NumberOfNewerReleases int    `json:"numberOfNewerReleases"`
-			ReleaseDate           string `json:"releaseDate"`
-		} `json:"versionRisk"`
-	} `json:"items"`
-}
-
 func (h *HubServer) login() bool {
 	// check if the Config entry is initialized
 	if h.Config == nil {
-		fmt.Printf("ERROR in HubServer no configuration available.\n")
+		log.Printf("ERROR in HubServer no configuration available.\n")
 		return false
 	}
 
-	fmt.Println(h.Config.Url)
+	log.Printf("Login attempt for %s\n", h.Config.Url)
 	u, err := url.ParseRequestURI(h.Config.Url)
 	if err != nil {
-		fmt.Printf("ERROR : url.ParseRequestURI: %s\n", err)
+		log.Printf("ERROR : url.ParseRequestURI: %s\n", err)
 		return false
 	}
 
@@ -208,7 +218,7 @@ func (h *HubServer) login() bool {
 	urlStr := fmt.Sprintf("%v", u)
 	req, err := http.NewRequest("POST", urlStr, bytes.NewBufferString(data.Encode()))
 	if err != nil {
-		fmt.Printf("ERROR NewRequest:\n%s\n", err)
+		log.Printf("ERROR NewRequest: %s\n", err)
 		return false
 	}
 
@@ -216,50 +226,105 @@ func (h *HubServer) login() bool {
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		fmt.Printf("ERROR client.do\n%s\n", err)
+		log.Printf("ERROR client.do %s\n", err)
 		return false
 	}
 	resp.Body.Close()
 	if resp.StatusCode != 204 {
-		fmt.Printf("ERROR : resp status : %s\n%d\n", resp.Status, resp.StatusCode)
+		log.Printf("ERROR: resp status: %s (%d)\n", resp.Status, resp.StatusCode)
 		return false
 	}
 	return true
 }
 
-type codeLocationsStruct struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		Status  string `json:"status"`
-		Type    string `json:"type"`
-		Url     string `json:"url"`
-		Project struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"project"`
-		Version struct {
-			Id   string `json:"id"`
-			Name string `json:"name"`
-		} `json;"version"`
-	} `json:"items"`
-}
-
 func (h *HubServer) findCodeLocations(searchCriterea string) *codeLocationsStruct {
 	searchStr := url.QueryEscape(searchCriterea)
-	getStr := fmt.Sprintf("%s/api/v1/composite/codelocations/?q=%s&limit=1&includeErrors=true", h.Config.Url, searchStr)
-	fmt.Println(getStr)
+	getStr := fmt.Sprintf("%s/api/codelocations/?q=%s&limit=5000", h.Config.Url, searchStr)
+	log.Println(getStr)
 
 	var codeLocations codeLocationsStruct
 
 	buf := h.getHubRestEndPointJson(getStr)
 	if buf.Len() == 0 {
-		fmt.Printf("Error no response for url : %s\n", getStr)
+		log.Printf("Error no response for url: %s\n", getStr)
 	}
 
 	if err := json.Unmarshal([]byte(buf.String()), &codeLocations); err != nil {
-		fmt.Printf("ERROR Unmarshall error : %s\n", err)
+		log.Printf("ERROR Unmarshall error: %s\n", err)
 	}
 	return &codeLocations
+}
+
+func (h *HubServer) findCodeLocationScanSummaries(url string) *codeLocationsScanSummariesStruct {
+
+	log.Println(url)
+
+	var codeLocationsScanSummaries codeLocationsScanSummariesStruct
+
+	buf := h.getHubRestEndPointJson(url)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", url)
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &codeLocationsScanSummaries); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+	}
+	return &codeLocationsScanSummaries
+}
+
+func (h *HubServer) findProjects(projectName string) *projectsStruct {
+	searchCriterea := "name:" + projectName
+	searchStr := url.QueryEscape(searchCriterea)
+	getStr := fmt.Sprintf("%s/api/projects/?q=%s&limit=5000", h.Config.Url, searchStr)
+	log.Println(getStr)
+
+	var projects projectsStruct
+
+	buf := h.getHubRestEndPointJson(getStr)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", getStr)
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &projects); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+	}
+	return &projects
+}
+
+func (h *HubServer) findProjectVersions(projectId string, projectVersion string) *projectVersionsStruct {
+	searchCriterea := "versionName:" + projectVersion
+	searchStr := url.QueryEscape(searchCriterea)
+	getStr := fmt.Sprintf("%s/api/projects/%s/versions?q=%s&limit=5000", h.Config.Url, projectId, searchStr)
+	log.Println(getStr)
+
+	var projectVersions projectVersionsStruct
+
+	buf := h.getHubRestEndPointJson(getStr)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", getStr)
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &projectVersions); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+	}
+	return &projectVersions
+}
+
+func (h *HubServer) getRiskProfile(url string) *riskProfileStruct {
+
+	log.Println(url)
+
+	var riskProfile riskProfileStruct
+
+	buf := h.getHubRestEndPointJson(url)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", url)
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &riskProfile); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+	}
+	return &riskProfile
 }
 
 func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer {
@@ -267,74 +332,21 @@ func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer
 	buf := new(bytes.Buffer)
 	resp, err := h.client.Get(restEndPointUrl)
 	if err != nil {
-		fmt.Printf("ERROR in client.url : %s\n get :\n%s\n", restEndPointUrl, err)
+		log.Printf("ERROR in client.url : %s get: %s\n", restEndPointUrl, err)
 		return buf
 	}
-	fmt.Println(resp.Status)
+	log.Printf("Endpoint status %s\n", resp.Status)
 	if resp.StatusCode != 200 {
-		fmt.Printf("ERROR return status : %s\nurl:%s\n", resp.Status, restEndPointUrl)
+		log.Printf("ERROR return status : %s url:%s\n", resp.Status, restEndPointUrl)
 		return buf
 	}
 
 	if _, err := buf.ReadFrom(resp.Body); err != nil {
-		fmt.Printf("ERROR in getProjects : %s\nurl: %s\n", err, restEndPointUrl)
+		log.Printf("ERROR reading from response: %s url: %s\n", err, restEndPointUrl)
 		return buf
 	}
 	defer resp.Body.Close()
 
 	return buf
 
-}
-
-func (h *HubServer) getBomRows(versionId string, maxRows int) *bomRows {
-	getStr := fmt.Sprintf("%s/api/v1/releases/%s/component-bom-entries?limit=%d&sortField=producerProject.name&ascending=true&offset=0&aggregationEntityType=RL&inUseOnly=true", h.Config.Url, versionId, maxRows)
-
-	var bomRows bomRows
-
-	buf := h.getHubRestEndPointJson(getStr)
-	if buf.Len() == 0 {
-		fmt.Printf("Error no response for url : %s\n", getStr)
-
-	}
-
-	if err := json.Unmarshal([]byte(buf.String()), &bomRows); err != nil {
-		fmt.Printf("ERROR Unmarshall error : %s\n", err)
-	}
-	return &bomRows
-}
-
-func (h *HubServer) getVulnerabilityBom(versionId string, maxRows int) *vulnerabilityBom {
-	getStr := fmt.Sprintf("%s/api/v1/releases/%s/vulnerability-bom?limit=%s&sortField=producerProject.name&ascending=true&offset=0&aggregationEntityType=RL", h.Config.Url, versionId, maxRows)
-
-	var vulns vulnerabilityBom
-
-	buf := h.getHubRestEndPointJson(getStr)
-	if buf.Len() == 0 {
-		fmt.Printf("Error getVulnerabilityBom no response for url : %s\n", getStr)
-
-	}
-
-	if err := json.Unmarshal([]byte(buf.String()), &vulns); err != nil {
-		fmt.Printf("ERROR getVulnerabilityBom Unmarshall error : %s\n", err)
-	}
-
-	return &vulns
-}
-
-func (h *HubServer) getVulnerabilities(versionId string, channelReleaseId string, producerReleaseId string, maxRows int) *vulnerabilities {
-	getStr := fmt.Sprintf("%s/api/v1/releases/%s/RL/%s/channels/%s/vulnerabilities?limit=%d&sortField=baseScore&offset=0", h.Config.Url, versionId, producerReleaseId, channelReleaseId, maxRows)
-
-	var vulns vulnerabilities
-
-	buf := h.getHubRestEndPointJson(getStr)
-	if buf.Len() == 0 {
-		fmt.Printf("Error getVulnerabilities no response for url : %s\n", getStr)
-
-	}
-
-	if err := json.Unmarshal([]byte(buf.String()), &vulns); err != nil {
-		fmt.Printf("ERROR getVulnerabilities Unmarshall error : %s\n", err)
-	}
-
-	return &vulns
 }

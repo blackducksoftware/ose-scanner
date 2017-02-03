@@ -60,8 +60,8 @@ func main() {
 
 	c := controller.NewController(openshiftClient, kubeClient, hub)
 
-	if !c.ValidateConfig () {
-		log.Printf ("Hub configuation information isn't valid. Please verify connectivity and values.")
+	if !c.ValidateConfig() {
+		log.Printf("Hub configuation information isn't valid. Please verify connectivity and values.")
 		os.Exit(1)
 	}
 
@@ -82,8 +82,8 @@ func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
-	hub.Config = &controller.HubConfig {}
-	
+	hub.Config = &controller.HubConfig{}
+
 	pflag.StringVar(&hub.Config.Host, "h", "REQUIRED", "The hostname of the Black Duck Hub server.")
 	pflag.StringVar(&hub.Config.Port, "p", "REQUIRED", "The port the Hub is communicating on")
 	pflag.StringVar(&hub.Config.Scheme, "s", "REQUIRED", "The communication scheme [http,https].")
@@ -141,4 +141,3 @@ func checkExpectedCmdlineParams() bool {
 
 	return true
 }
-
