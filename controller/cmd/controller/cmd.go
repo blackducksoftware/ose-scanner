@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
 	_ "github.com/openshift/origin/pkg/api/install"
@@ -33,6 +34,8 @@ import (
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
 
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/client/restclient"
+
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -43,10 +46,20 @@ func main() {
 	pflag.Parse()
 
 	if !checkExpectedCmdlineParams() {
-		return
+		os.Exit(1)
 	}
 
-	config, err := clientcmd.DefaultClientConfig(pflag.NewFlagSet("empty", pflag.ContinueOnError)).ClientConfig()
+	config, err := restclient.InClusterConfig()
+	if err != nil {
+		log.Printf("Error getting in cluster config. Fallback to native config. Error message: %s", err)
+
+		config, err = clientcmd.DefaultClientConfig(pflag.NewFlagSet("empty", pflag.ContinueOnError)).ClientConfig()
+		if err != nil {
+			log.Printf("Error creating default client config: %s", err)
+			os.Exit(1)
+		}
+	}
+
 	kubeClient, err := kclient.New(config)
 	if err != nil {
 		log.Printf("Error creating cluster config: %s", err)
@@ -59,6 +72,11 @@ func main() {
 	}
 
 	c := controller.NewController(openshiftClient, kubeClient, hub)
+
+	if !c.ValidateDockerConfig() {
+		log.Printf("Docker configuation information isn't valid. Please verify connectivity and permissions.")
+		os.Exit(1)
+	}
 
 	if !c.ValidateConfig() {
 		log.Printf("Hub configuation information isn't valid. Please verify connectivity and values.")
@@ -90,51 +108,80 @@ func init() {
 	pflag.StringVar(&hub.Config.User, "u", "REQUIRED", "The Black Duck Hub user")
 	pflag.StringVar(&hub.Config.Password, "w", "REQUIRED", "Password for the user.")
 	pflag.StringVar(&hub.Scanner, "scanner", "REQUIRED", "Scanner image")
-	pflag.IntVar(&hub.Workers, "workers", controller.MaxWorkers, "Number of container workers")
+	pflag.IntVar(&hub.Workers, "workers", 0, "Number of container workers")
 }
 
 func checkExpectedCmdlineParams() bool {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
 	if hub.Config.Host == "REQUIRED" {
-		log.Println("-h host is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_HOST")
+		if val == "" {
+			log.Println("-h host argument or BDS_HOST environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Config.Host = val
 	}
 
 	if hub.Config.Port == "REQUIRED" {
-		log.Println("-p port is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_PORT")
+		if val == "" {
+			log.Println("-p port argument or BDS_PORT environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Config.Port = val
 	}
 
 	if hub.Config.Scheme == "REQUIRED" {
-		log.Println("-s scheme is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_SCHEME")
+		if val == "" {
+			log.Println("-s scheme argument or BDS_SCHEME environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Config.Scheme = val
 	}
 
 	if hub.Config.User == "REQUIRED" {
-		log.Println("-u username is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_USER")
+		if val == "" {
+			log.Println("-u username argument or BDS_USER environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Config.User = val
 	}
 
 	if hub.Config.Password == "REQUIRED" {
-		log.Println("-w password is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_PASSWORD")
+		if val == "" {
+			log.Println("-w password argument or BDS_PASSWORD environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Config.Password = val
 	}
 
 	if hub.Scanner == "REQUIRED" {
-		log.Println("-scanner Hub scanner image is required")
-		pflag.PrintDefaults()
-		return false
+		val := os.Getenv("BDS_SCANNER")
+		if val == "" {
+			log.Println("-scanner argument or BDS_SCANNER environment is required")
+			pflag.PrintDefaults()
+			return false
+		}
+		hub.Scanner = val
 	}
 
 	if hub.Workers < 1 {
-		log.Printf("Setting workers from %d to %d\n", hub.Workers, controller.MaxWorkers)
-		hub.Workers = controller.MaxWorkers
+		val := os.Getenv("BDS_WORKERS")
+		number, _ := strconv.Atoi(val)
+		if number < 1 {
+			log.Printf("Setting workers from %d to %d\n", number, controller.MaxWorkers)
+			hub.Workers = controller.MaxWorkers
+		}
+		hub.Workers = number
 	}
 
 	hub.Config.Url = fmt.Sprintf("%s://%s", hub.Config.Scheme, hub.Config.Host)

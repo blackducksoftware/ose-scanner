@@ -185,6 +185,24 @@ func (c *Controller) ValidateConfig() bool {
 
 }
 
+func (c *Controller) ValidateDockerConfig() bool {
+	docker := NewDocker()
+	if docker.client == nil {
+		log.Printf("Unable to connect to Docker runtime\n")
+		return false
+	}
+
+	_, err := docker.client.Info()
+	if err != nil {
+		log.Printf("Unable to connect to Docker runtime. %s\n", err)
+		return false
+	}
+
+	log.Printf("Validated Docker runtime connection\n")
+	return true
+
+}
+
 // DisplayNameAndNameForProject returns a formatted string containing the name
 // of the project and includes the display name if it differs.
 func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {

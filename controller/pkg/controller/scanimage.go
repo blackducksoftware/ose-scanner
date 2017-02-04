@@ -81,6 +81,10 @@ func (image ScanImage) scan() (e error) {
 	args = append(args, image.digest)
 
 	docker := NewDocker()
+	if docker.client == nil {
+		log.Printf("No Docker client connection\n")
+		return errors.New("Invalid Docker connection")
+	}
 
 	goodScan, err := docker.launchContainer(Hub.Scanner, args)
 

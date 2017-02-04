@@ -13,4 +13,4 @@ LABEL vendor="Black Duck Software" \
       com.blackducksoftware.platform.component="Controller Service" 
 
 # Clear any existing entry points
-ENTRYPOINT []
+ENTRYPOINT ["/ose_controller"]
