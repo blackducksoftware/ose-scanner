@@ -49,11 +49,10 @@ func NewScanImage(ID string, Reference string) *ScanImage {
 	}
 }
 
-func (image ScanImage) scan() (e error) {
-
-	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+func (image ScanImage) getArgs () ([]string) {
 
 	args := []string{}
+
 	args = append(args, "/ose_scanner")
 
 	args = append(args, "-h")
@@ -80,11 +79,30 @@ func (image ScanImage) scan() (e error) {
 	args = append(args, "-digest")
 	args = append(args, image.digest)
 
+	return args
+
+}
+
+func (image ScanImage) scan() (e error) {
+
+	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+
 	docker := NewDocker()
 	if docker.client == nil {
 		log.Printf("No Docker client connection\n")
 		return errors.New("Invalid Docker connection")
 	}
+
+	if ! docker.imageExists (image.digest) {
+		log.Printf("Image %s does not exist\n", image.digest)
+		return errors.New("Image does not exist")
+	}
+	
+
+	/*args := []string{}
+	image.setArgs (&args)
+	*/
+	args := image.getArgs()
 
 	goodScan, err := docker.launchContainer(Hub.Scanner, args)
 
