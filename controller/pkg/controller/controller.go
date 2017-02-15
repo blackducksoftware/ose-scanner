@@ -37,20 +37,11 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-const (
-	displayNameOldAnnotation = "displayName"
-	displayNameAnnotation    = "openshift.io/display-name"
-)
-
 type HubParams struct {
-	//Host     string
-	//Port     string
-	//Scheme   string
-	//Username string
-	//Password string
 	Config  *HubConfig
 	Scanner string
 	Workers int
+	Version string
 }
 
 var Hub HubParams
@@ -64,6 +55,7 @@ type Controller struct {
 	jobQueue        chan Job
 	wait            sync.WaitGroup
 	images          map[string]*ScanImage
+	annotation      *Annotator
 	sync.RWMutex
 }
 
@@ -76,8 +68,6 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 
 	jobQueue := make(chan Job, Hub.Workers)
 
-	var wait sync.WaitGroup
-
 	return &Controller{
 		openshiftClient: os,
 		kubeClient:      kc,
@@ -85,8 +75,8 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		typer:           typer,
 		f:               f,
 		jobQueue:        jobQueue,
-		wait:            wait,
-		images:          make(map[string]*ScanImage),
+		images:     make(map[string]*ScanImage),
+		annotation: NewAnnotator(os, hub.Version, hub.Config.Host),
 	}
 }
 
@@ -134,10 +124,17 @@ func (c *Controller) Load(done <-chan struct{}) {
 func (c *Controller) AddImage(ID string, Reference string) {
 
 	c.Lock()
+	defer c.Unlock()
+
 	_, ok := c.images[Reference]
 	if !ok {
 
-		imageItem := NewScanImage(ID, Reference)
+		imageItem := newScanImage(ID, Reference, c.annotation)
+
+		if !c.annotation.IsScanNeeded(imageItem.sha) {
+			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
+			// return
+		}
 
 		c.images[Reference] = imageItem
 
@@ -151,7 +148,6 @@ func (c *Controller) AddImage(ID string, Reference string) {
 		c.jobQueue <- job
 
 	}
-	c.Unlock()
 
 }
 
@@ -201,22 +197,6 @@ func (c *Controller) ValidateDockerConfig() bool {
 	log.Printf("Validated Docker runtime connection\n")
 	return true
 
-}
-
-// DisplayNameAndNameForProject returns a formatted string containing the name
-// of the project and includes the display name if it differs.
-func DisplayNameAndNameForProject(project kapi.ObjectMeta) string {
-	displayName := project.Annotations[displayNameAnnotation]
-
-	if len(displayName) == 0 {
-		displayName = project.Annotations[displayNameOldAnnotation]
-	}
-
-	if len(displayName) > 0 && displayName != project.Name {
-		// we want the machine version, not the human readable one
-		return project.Name
-	}
-	return project.Name
 }
 
 func init() {

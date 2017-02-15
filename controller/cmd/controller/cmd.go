@@ -39,6 +39,7 @@ import (
 	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
+var bds_version string
 var hub controller.HubParams
 
 func main() {
@@ -100,7 +101,11 @@ func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
+	log.Printf("Initializing Black Duck scan controller version %s\n", bds_version)
+
 	hub.Config = &controller.HubConfig{}
+
+	hub.Version = bds_version
 
 	pflag.StringVar(&hub.Config.Host, "h", "REQUIRED", "The hostname of the Black Duck Hub server.")
 	pflag.StringVar(&hub.Config.Port, "p", "REQUIRED", "The port the Hub is communicating on")

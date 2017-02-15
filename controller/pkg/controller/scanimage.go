@@ -33,23 +33,27 @@ import (
 type ScanImage struct {
 	imageId    string
 	taggedName string
+	sha        string
 	digest     string
 	scanned    bool
+	annotate   *Annotator
 }
 
-func NewScanImage(ID string, Reference string) *ScanImage {
+func newScanImage(ID string, Reference string, annotate *Annotator) *ScanImage {
 
 	tag := strings.Split(Reference, "@")
 
 	return &ScanImage{
 		imageId:    ID,
 		taggedName: tag[0],
+		sha:        tag[1],
 		digest:     Reference,
 		scanned:    false,
+		annotate:   annotate,
 	}
 }
 
-func (image ScanImage) getArgs () ([]string) {
+func (image ScanImage) getArgs() []string {
 
 	args := []string{}
 
@@ -93,11 +97,10 @@ func (image ScanImage) scan() (e error) {
 		return errors.New("Invalid Docker connection")
 	}
 
-	if ! docker.imageExists (image.digest) {
+	if !docker.imageExists(image.digest) {
 		log.Printf("Image %s does not exist\n", image.digest)
 		return errors.New("Image does not exist")
 	}
-	
 
 	/*args := []string{}
 	image.setArgs (&args)
@@ -198,6 +201,12 @@ func (image ScanImage) results() (e error) {
 	}
 
 	log.Printf("Found %d high severity vulnerabilities for %s:%s\n", vulnerabilities, image.taggedName, image.imageId[:10])
+
+	saved := image.annotate.SaveResults(image.sha, vulnerabilities, projectId)
+
+	if !saved {
+		log.Printf("Unable to annotate image with results %s\n", image.imageId)
+	}
 
 	//TODO - Hook results into AdmissionController
 	return nil

@@ -36,14 +36,14 @@ type Docker struct {
 	shortID string
 }
 
-func (d Docker) imageExists (image string) (bool) {
-	imageDetails, err := d.client.InspectImage (image)
+func (d Docker) imageExists(image string) bool {
+	imageDetails, err := d.client.InspectImage(image)
 	if err != nil {
 		log.Printf("Error testing if image %s exists: %s\n", image, err)
 		return false
 	}
 
-	log.Printf ("Image %s exists with id %s\n", image, imageDetails.ID )
+	log.Printf("Image %s exists with id %s\n", image, imageDetails.ID)
 	return true
 
 }
