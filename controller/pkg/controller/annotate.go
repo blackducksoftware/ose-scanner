@@ -77,8 +77,8 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		log.Printf("Image %s has no labels - creating.\n", ref)
 		labels = make(map[string]string)
 	}
-	labels["com.blackducksoftware.com.policy-violations"] = policy
-	labels["com.blackducksoftware.com.has-policy-violations"] = hasPolicyViolations 
+	labels["com.blackducksoftware.policy-violations"] = policy
+	labels["com.blackducksoftware.has-policy-violations"] = hasPolicyViolations 
 	image.ObjectMeta.Labels = labels
 
 	annotations := image.ObjectMeta.Annotations
