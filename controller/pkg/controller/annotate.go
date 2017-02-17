@@ -55,12 +55,15 @@ func NewAnnotator(os *osclient.Client, ScannerVersion string, HubServer string) 
 	return wc
 }
 
+// Save the results of a scan on the specified image
 func (a *Annotator) SaveResults(ref string, violations int, project string) bool {
 
-	policy := "No violations"
+	policy := "None"
+	hasPolicyViolations := "false"
 
 	if violations != 0 {
-		policy = fmt.Sprintf("%d violations found", violations)
+		policy = fmt.Sprintf("%d", violations)
+		hasPolicyViolations = "true"
 	}
 
 	image, err := a.openshiftClient.Images().Get(ref)
@@ -75,6 +78,7 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		labels = make(map[string]string)
 	}
 	labels["com.blackducksoftware.com.policy-violations"] = policy
+	labels["com.blackducksoftware.com.has-policy-violations"] = hasPolicyViolations 
 	image.ObjectMeta.Labels = labels
 
 	annotations := image.ObjectMeta.Annotations
@@ -83,23 +87,24 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		annotations = make(map[string]string)
 	}
 
-	annotations["blackducksoftware.com/scanner-version"] = a.ScannerVersion
-	annotations["blackducksoftware.com/hub-server"] = a.HubServer
+	annotations["blackducksoftware.com/hub-scanner-version"] = a.ScannerVersion
+	annotations["blackducksoftware.com/attestation-hub-server"] = a.HubServer
 
 	//attestation := fmt.Sprintf("%s~%s", component, project)
 	annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
 	image.ObjectMeta.Annotations = annotations
 
-	/*image, err = a.openshiftClient.Images().Update(image)
+	image, err = a.openshiftClient.Images().Update(image)
 	if err != nil {
 		log.Printf("Error updating image: %s. %s\n", ref, err)
 		return false
-	}*/
+	}
 
 	return true
 
 }
 
+// Determine if a scan of the specified image is required
 func (a *Annotator) IsScanNeeded(ref string) bool {
 
 	image, err := a.openshiftClient.Images().Get(ref)

@@ -62,7 +62,7 @@ type Controller struct {
 func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Controller {
 
 	f := clientcmd.New(pflag.NewFlagSet("empty", pflag.ContinueOnError))
-	mapper, typer := f.Object()
+	mapper, typer := f.Object(false)
 
 	Hub = hub
 
