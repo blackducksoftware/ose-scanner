@@ -14,3 +14,7 @@ all:
 vet:
 	go fmt ${PKG_LIST}
 	go vet ${PKG_LIST}
+
+travis:
+	mkdir output
+	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/controller ./cmd/controller
