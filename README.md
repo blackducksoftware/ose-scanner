@@ -3,6 +3,7 @@
 The ose-scanner provides integration between Black Duck Hub and OpenShift v3. In the current implementation, pre-existing OpenShift images are automatically discovered and any ImageStream activity is monitored. When an image is discovered, the integration kicks off a Black Duck scan engine container to perform the scan and upload the results to your Black Duck Hub instance. Obviously this integration requires both OpenShift and Black Duck Hub!
 
 ## Build
+[![Build Status](https://travis-ci.org/blackducksoftware/ose-scanner.svg?branch=master)](https://travis-ci.org/blackducksoftware/ose-scanner)
 [![Go Report Card](https://goreportcard.com/badge/github.com/blackducksoftware/ose-scanner)](https://goreportcard.com/report/github.com/blackducksoftware/ose-scanner)
 
 ## Documentation
