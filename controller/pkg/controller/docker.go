@@ -182,7 +182,7 @@ func (d Docker) pipeOutput(ID string, done chan bool, abort chan bool) error {
 func NewDocker() Docker {
 
 	endpoint := "unix:///var/run/docker.sock"
-	client, err := docker.NewClient(endpoint)
+	client, err := docker.NewVersionedClient(endpoint, "1.22")
 	if err != nil {
 		log.Printf("Error connecting to docker engine %s\n", err)
 	}
