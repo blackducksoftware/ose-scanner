@@ -31,8 +31,9 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 
 	osclient "github.com/openshift/origin/pkg/client"
-
 )
+
+const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
 
 type Annotator struct {
 	openshiftClient *osclient.Client
@@ -78,7 +79,7 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		labels = make(map[string]string)
 	}
 	labels["com.blackducksoftware.policy-violations"] = policy
-	labels["com.blackducksoftware.has-policy-violations"] = hasPolicyViolations 
+	labels["com.blackducksoftware.has-policy-violations"] = hasPolicyViolations
 	image.ObjectMeta.Labels = labels
 
 	annotations := image.ObjectMeta.Annotations
@@ -87,7 +88,7 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		annotations = make(map[string]string)
 	}
 
-	annotations["blackducksoftware.com/hub-scanner-version"] = a.ScannerVersion
+	annotations[scannerVersionLabel] = a.ScannerVersion
 	annotations["blackducksoftware.com/attestation-hub-server"] = a.HubServer
 
 	//attestation := fmt.Sprintf("%s~%s", component, project)
@@ -99,6 +100,8 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		log.Printf("Error updating image: %s. %s\n", ref, err)
 		return false
 	}
+
+	log.Printf("Applied annotation for image: %s.\n", ref)
 
 	return true
 
@@ -121,7 +124,7 @@ func (a *Annotator) IsScanNeeded(ref string) bool {
 		return true
 	}
 
-	bdsVer, ok := annotations["blackducksoftware.com/scanner-version"]
+	bdsVer, ok := annotations[scannerVersionLabel]
 	if ok && (strings.Compare(bdsVer, a.ScannerVersion) == 0) {
 		log.Printf("Image %s has been scanned by our scanner. Skipping new scan.\n", ref)
 		return false

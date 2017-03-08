@@ -75,8 +75,8 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		typer:           typer,
 		f:               f,
 		jobQueue:        jobQueue,
-		images:     make(map[string]*ScanImage),
-		annotation: NewAnnotator(os, hub.Version, hub.Config.Host),
+		images:          make(map[string]*ScanImage),
+		annotation:      NewAnnotator(os, hub.Version, hub.Config.Host),
 	}
 }
 
