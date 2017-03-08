@@ -1,6 +1,8 @@
 FROM projectatomic/atomicapp
 MAINTAINER Black Duck Hub Team
 
+RUN yum -y update && yum clean all
+
 ARG bds_ver
 
 ENV APP_HOME=/scan.cli-${bds_ver} \
