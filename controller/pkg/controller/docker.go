@@ -31,6 +31,11 @@ import (
 	"time"
 )
 
+type ScanResult struct {
+	completed bool
+	scanId    string
+}
+
 type Docker struct {
 	client  *docker.Client
 	shortID string
@@ -48,10 +53,12 @@ func (d Docker) imageExists(image string) bool {
 
 }
 
-func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
+func (d Docker) launchContainer(scanner string, args []string) (ScanResult, error) {
 
 	binds := []string{}
 	binds = append(binds, "/var/run/docker.sock:/var/run/docker.sock")
+
+	emptyScanResult := ScanResult{completed: false, scanId: ""}
 
 	container, err := d.client.CreateContainer(
 		docker.CreateContainerOptions{
@@ -70,12 +77,12 @@ func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
 
 	if err != nil {
 		log.Printf("Error creating container %s: %s\n", scanner, err)
-		return false, err
+		return emptyScanResult, err
 	}
 
 	d.shortID = container.ID[:10]
 
-	done := make(chan bool)
+	done := make(chan ScanResult)
 	abort := make(chan bool, 1)
 	d.pipeOutput(container.ID, done, abort)
 
@@ -83,7 +90,7 @@ func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
 
 	if err != nil {
 		log.Printf("Error starting container ID %s for %s: %s\n", d.shortID, scanner, err)
-		return false, err
+		return emptyScanResult, err
 	}
 
 	log.Printf("Started scan container %s\n", d.shortID)
@@ -92,7 +99,7 @@ func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
 
 	if err != nil {
 		log.Printf("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
-		return false, err
+		return emptyScanResult, err
 	} else {
 		log.Printf("Scan container %s exit with status %d\n", d.shortID, exit)
 	}
@@ -106,17 +113,17 @@ func (d Docker) launchContainer(scanner string, args []string) (bool, error) {
 
 	if err != nil {
 		log.Printf("Error removing container ID %s: %s\n", d.shortID, err)
-		return false, err
+		return emptyScanResult, err
 	}
 
 	abort <- true
 	result := <-done
-	log.Printf("Scan complete of %s with result %t\n", d.shortID, result)
+	log.Printf("Scan complete of %s with result %t\n", d.shortID, result.completed)
 
 	return result, nil
 }
 
-func (d Docker) pipeOutput(ID string, done chan bool, abort chan bool) error {
+func (d Docker) pipeOutput(ID string, done chan ScanResult, abort chan bool) error {
 	r, w := io.Pipe()
 
 	options := docker.AttachToContainerOptions{
@@ -151,17 +158,24 @@ func (d Docker) pipeOutput(ID string, done chan bool, abort chan bool) error {
 
 	}(r, d.shortID, abort)
 
-	go func(reader io.Reader, shortID string, c chan bool) {
+	go func(reader io.Reader, shortID string, c chan ScanResult) {
 		scanner := bufio.NewScanner(reader)
-		scan := false
+		scan := ScanResult{completed: false, scanId: ""}
 
 		for scanner.Scan() {
 			out := scanner.Text()
 			if strings.Contains(out, "Post Scan...") {
 				log.Printf("Found completed scan with result for %s\n", shortID)
-				scan = true
+				scan.completed = true
 			}
 			log.Printf("%s: %s\n", shortID, out)
+
+			if strings.Contains(out, "ScanContainerView{scanId=") {
+				cmd := strings.Split(out, "ScanContainerView{scanId=")
+				eos := strings.Index(cmd[1], ",")
+				scan.scanId = cmd[1][:eos]
+				log.Printf("Found scan ID %s with result for %s\n", scan.scanId, shortID)
+			}
 		}
 
 		/*
@@ -171,7 +185,7 @@ func (d Docker) pipeOutput(ID string, done chan bool, abort chan bool) error {
 				log.Printf("Scanner error on %s: %s\n", shortID, err)
 			} */
 
-		log.Printf("Placing scan result %t into channel for %s\n", scan, shortID)
+		log.Printf("Placing scan result %t from scanId %s into channel for %s\n", scan.completed, scan.scanId, shortID)
 		c <- scan
 
 	}(r, d.shortID, done)

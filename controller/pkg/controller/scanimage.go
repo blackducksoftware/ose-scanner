@@ -36,6 +36,7 @@ type ScanImage struct {
 	sha        string
 	digest     string
 	scanned    bool
+	scanId     string
 	annotate   *Annotator
 }
 
@@ -102,9 +103,6 @@ func (image ScanImage) scan() (e error) {
 		return errors.New("Image does not exist")
 	}
 
-	/*args := []string{}
-	image.setArgs (&args)
-	*/
 	args := image.getArgs()
 
 	goodScan, err := docker.launchContainer(Hub.Scanner, args)
@@ -114,11 +112,12 @@ func (image ScanImage) scan() (e error) {
 		return err
 	}
 
-	log.Printf("Done Scanning: %s (%s) with result %t\n", image.taggedName, image.imageId[:10], goodScan)
+	log.Printf("Done Scanning: %s (%s) with result %t using scanId %s\n", image.taggedName, image.imageId[:10], goodScan.completed, goodScan.scanId)
 
 	image.scanned = true
+	image.scanId = goodScan.scanId
 
-	if goodScan {
+	if goodScan.completed {
 		return image.results()
 	}
 
@@ -134,80 +133,209 @@ func (image ScanImage) results() (e error) {
 		return errors.New("Invalid Hub credentials")
 	}
 
-	// check if the scan was completed
-	codeLocations := hub.findCodeLocations(image.imageId)
-	if len(codeLocations.Items) == 0 {
-		e := fmt.Sprintf("ERROR no code locations for image: %s", image.imageId)
-		log.Printf("%s\n", e)
-		return errors.New(e)
-	}
-
-	scanSummaryUrl := codeLocations.Items[codeLocations.TotalCount-1].Meta.Links[0].Href
-
-	scanSummaries := hub.findCodeLocationScanSummaries(scanSummaryUrl)
-	if len(scanSummaries.Items) != 1 {
+	scanSummary, ok := hub.getScanSummary(image.scanId)
+	if !ok {
 		e := fmt.Sprintf("ERROR no scan summary for image: %s", image.imageId)
 		log.Printf("%s\n", e)
 		return errors.New(e)
 	}
 
-	for strings.Compare(scanSummaries.Items[0].Status, "COMPLETE") != 0 {
+	for strings.Compare(scanSummary.Status, "COMPLETE") != 0 {
 		time.Sleep(1 * time.Minute)
-		scanSummaries = hub.findCodeLocationScanSummaries(scanSummaryUrl)
-		log.Printf("Scan status: %s\n", scanSummaries.Items[0].Status)
+		scanSummary, ok = hub.getScanSummary(image.scanId)
+		if !ok {
+			// someone deleted our codelocation underneath us
+			e := fmt.Sprintf("ERROR processing scan summary for image %s. No items returned. Was code location modified?", image.imageId)
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
 
-		if strings.Compare(scanSummaries.Items[0].Status, "ERROR") == 0 {
-			e := fmt.Sprintf("ERROR processing scan summaries for image: %s", image.imageId)
+		log.Printf("Scan status: %s\n", scanSummary.Status)
+
+		if strings.Compare(scanSummary.Status, "ERROR") == 0 {
+			e := fmt.Sprintf("ERROR processing scan summary for image: %s", image.imageId)
 			log.Printf("%s\n", e)
 			return errors.New(e)
 		}
 	}
 
-	projects := hub.findProjects(image.taggedName)
-	if len(projects.Items) != 1 {
-		e := fmt.Sprintf("ERROR no projects summary for image: %s", image.taggedName)
+	codeLocationUrl := ""
+	for _, Item := range scanSummary.Meta.Links {
+
+		log.Printf("  Processing scan summary link: %s\n", Item.Rel)
+		if strings.Compare(Item.Rel, "codelocation") == 0 {
+			codeLocationUrl = Item.Href
+			break
+		}
+	}
+
+	if len(codeLocationUrl) == 0 {
+		e := fmt.Sprintf("ERROR unable to locate code location URL for image: %s", image.imageId)
 		log.Printf("%s\n", e)
 		return errors.New(e)
 	}
 
-	index := strings.LastIndex(projects.Items[0].Meta.Href, "/")
-	projectId := projects.Items[0].Meta.Href[index+1:]
+	codeLocation, ok := hub.getCodeLocation(codeLocationUrl)
+	if !ok {
+		e := fmt.Sprintf("ERROR no code location found for image: %s", image.imageId)
+		log.Printf("%s\n", e)
+		return errors.New(e)
+	}
 
-	projectVersions := hub.findProjectVersions(projectId, image.imageId[:10])
-	if len(projectVersions.Items) != 1 {
-		e := fmt.Sprintf("ERROR unable to locate project version for image: %s:%s", image.taggedName, image.imageId[:10])
+	projectVersionUrl := codeLocation.MappedProjectVersion
+	projectVersion, ok := hub.getProjectVersion(projectVersionUrl)
+	if !ok {
+		e := fmt.Sprintf("ERROR no project version found for image: %s", image.imageId)
 		log.Printf("%s\n", e)
 		return errors.New(e)
 	}
 
 	vulnerabilities := 0
+	violations := 0
 
 	// we have a matching version for our image, need to locate the risk-profile
-	for _, Item := range projectVersions.Items[0].Meta.Links {
+	for _, Item := range projectVersion.Meta.Links {
 
 		log.Printf("  Processing version link: %s\n", Item.Rel)
 		if strings.Compare(Item.Rel, "riskProfile") == 0 {
-
-			riskProfile := hub.getRiskProfile(Item.Href)
-			if riskProfile == nil {
+			riskProfile, ok := hub.getRiskProfile(Item.Href)
+			if riskProfile == nil || !ok {
 				e := fmt.Sprintf("ERROR unable to load risk profile for image: %s:%s", image.taggedName, image.imageId[:10])
 				log.Printf("%s\n", e)
 				return errors.New(e)
 			}
 			vulnerabilities = riskProfile.Categories.VULNERABILITY.HIGH
+		}
 
-			break
+		if strings.Compare(Item.Rel, "policy-status") == 0 {
+			policyStatus, ok := hub.getPolicyStatus(Item.Href)
+			if policyStatus == nil || !ok {
+				e := fmt.Sprintf("ERROR unable to load policy status for image: %s:%s", image.taggedName, image.imageId[:10])
+				log.Printf("%s\n", e)
+				return errors.New(e)
+			}
+			for _, PolicyItem := range policyStatus.ComponentVersionStatusCounts {
+				if strings.Compare(PolicyItem.Name, "IN_VIOLATION") == 0 {
+					violations = PolicyItem.Value
+				}
+			}
+
 		}
 	}
 
-	log.Printf("Found %d high severity vulnerabilities for %s:%s\n", vulnerabilities, image.taggedName, image.imageId[:10])
+	log.Printf("Found %d high severity vulnerabilities and %d policy violations for %s:%s\n", vulnerabilities, violations, image.taggedName, image.imageId[:10])
 
-	saved := image.annotate.SaveResults(image.sha, vulnerabilities, projectId)
+	saved := image.annotate.SaveResults(image.sha, violations, vulnerabilities, projectVersionUrl, image.scanId)
 
 	if !saved {
 		log.Printf("Unable to annotate image with results %s\n", image.imageId)
 	}
 
-	//TODO - Hook results into AdmissionController
 	return nil
+
+	/*
+		// check if the scan was completed
+		codeLocations := hub.findCodeLocations(image.imageId)
+		if len(codeLocations.Items) == 0 {
+			e := fmt.Sprintf("ERROR no code locations for image: %s", image.imageId)
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
+
+		scanSummaryUrl := codeLocations.Items[codeLocations.TotalCount-1].Meta.Links[0].Href
+
+		scanSummaries := hub.findCodeLocationScanSummaries(scanSummaryUrl)
+		if len(scanSummaries.Items) != 1 {
+			e := fmt.Sprintf("ERROR no scan summary for image: %s", image.imageId)
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
+
+		for strings.Compare(scanSummaries.Items[0].Status, "COMPLETE") != 0 {
+			time.Sleep(1 * time.Minute)
+			scanSummaries = hub.findCodeLocationScanSummaries(scanSummaryUrl)
+			if len(scanSummaries.Items) == 0 || scanSummaries.TotalCount == 0 {
+				// someone deleted our codelocation underneath us
+				e := fmt.Sprintf("ERROR processing scan summaries for image %s. No items returned. Was code location modified?", image.imageId)
+				log.Printf("%s\n", e)
+				return errors.New(e)
+			}
+
+			log.Printf("Scan status: %s\n", scanSummaries.Items[0].Status)
+
+			if strings.Compare(scanSummaries.Items[0].Status, "ERROR") == 0 {
+				e := fmt.Sprintf("ERROR processing scan summaries for image: %s", image.imageId)
+				log.Printf("%s\n", e)
+				return errors.New(e)
+			}
+		}
+
+		projects := hub.findProjects(image.taggedName)
+		if len(projects.Items) != 1 {
+			e := fmt.Sprintf("ERROR no projects summary for image: %s", image.taggedName)
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
+
+		index := strings.LastIndex(projects.Items[0].Meta.Href, "/")
+		projectId := projects.Items[0].Meta.Href[index+1:]
+
+		projectVersions := hub.findProjectVersions(projectId, image.imageId[:10])
+		if len(projectVersions.Items) != 1 {
+			e := fmt.Sprintf("ERROR unable to locate project version for image: %s:%s", image.taggedName, image.imageId[:10])
+			log.Printf("%s\n", e)
+			return errors.New(e)
+		}
+
+		vulnerabilities := 0
+
+		// we have a matching version for our image, need to locate the risk-profile
+		for _, Item := range projectVersions.Items[0].Meta.Links {
+
+			log.Printf("  Processing version link: %s\n", Item.Rel)
+			if strings.Compare(Item.Rel, "riskProfile") == 0 {
+
+				riskProfile := hub.getRiskProfile(Item.Href)
+				if riskProfile == nil {
+					e := fmt.Sprintf("ERROR unable to load risk profile for image: %s:%s", image.taggedName, image.imageId[:10])
+					log.Printf("%s\n", e)
+					return errors.New(e)
+				}
+				vulnerabilities = riskProfile.Categories.VULNERABILITY.HIGH
+
+				break
+			}
+		}
+
+		log.Printf("Found %d high severity vulnerabilities for %s:%s\n", vulnerabilities, image.taggedName, image.imageId[:10])
+
+		saved := image.annotate.SaveResults(image.sha, vulnerabilities, projectId)
+
+		if !saved {
+			log.Printf("Unable to annotate image with results %s\n", image.imageId)
+		}
+
+		//TODO - Hook results into AdmissionController
+		return nil
+	*/
+
+}
+
+func (image ScanImage) exists() bool {
+
+	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+
+	docker := NewDocker()
+	if docker.client == nil {
+		log.Printf("No Docker client connection\n")
+		return false
+	}
+
+	if !docker.imageExists(image.digest) {
+		log.Printf("Image %s does not exist\n", image.digest)
+		return false
+	}
+
+	return true
+
 }

@@ -23,7 +23,7 @@ under the License.
 package controller
 
 import (
-	"encoding/base64"
+	//	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"
@@ -34,6 +34,7 @@ import (
 )
 
 const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
+const scannerHubServerLabel = "blackducksoftware.com/attestation-hub-server"
 
 type Annotator struct {
 	openshiftClient *osclient.Client
@@ -57,14 +58,22 @@ func NewAnnotator(os *osclient.Client, ScannerVersion string, HubServer string) 
 }
 
 // Save the results of a scan on the specified image
-func (a *Annotator) SaveResults(ref string, violations int, project string) bool {
+func (a *Annotator) SaveResults(ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string) bool {
 
 	policy := "None"
 	hasPolicyViolations := "false"
 
+	vulns := "None"
+	hasVulns := "false"
+
 	if violations != 0 {
 		policy = fmt.Sprintf("%d", violations)
 		hasPolicyViolations = "true"
+	}
+
+	if vulnerabilitiies != 0 {
+		vulns = fmt.Sprintf("%d", vulnerabilitiies)
+		hasVulns = "true"
 	}
 
 	image, err := a.openshiftClient.Images().Get(ref)
@@ -78,8 +87,11 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 		log.Printf("Image %s has no labels - creating.\n", ref)
 		labels = make(map[string]string)
 	}
-	labels["com.blackducksoftware.policy-violations"] = policy
-	labels["com.blackducksoftware.has-policy-violations"] = hasPolicyViolations
+	labels["com.blackducksoftware.image.policy-violations"] = policy
+	labels["com.blackducksoftware.image.has-policy-violations"] = hasPolicyViolations
+
+	labels["com.blackducksoftware.image.vulnerabilities"] = vulns
+	labels["com.blackducksoftware.image.has-vulnerabilities"] = hasVulns
 	image.ObjectMeta.Labels = labels
 
 	annotations := image.ObjectMeta.Annotations
@@ -89,10 +101,12 @@ func (a *Annotator) SaveResults(ref string, violations int, project string) bool
 	}
 
 	annotations[scannerVersionLabel] = a.ScannerVersion
-	annotations["blackducksoftware.com/attestation-hub-server"] = a.HubServer
+	annotations[scannerHubServerLabel] = a.HubServer
+	annotations["blackducksoftware.com/project-endpoint"] = projectVersionUrl
+	annotations["blackducksoftware.com/scan-id"] = scanId
 
 	//attestation := fmt.Sprintf("%s~%s", component, project)
-	annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
+	//annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
 	image.ObjectMeta.Annotations = annotations
 
 	image, err = a.openshiftClient.Images().Update(image)
@@ -124,11 +138,23 @@ func (a *Annotator) IsScanNeeded(ref string) bool {
 		return true
 	}
 
+	versionRequired := true
 	bdsVer, ok := annotations[scannerVersionLabel]
 	if ok && (strings.Compare(bdsVer, a.ScannerVersion) == 0) {
 		log.Printf("Image %s has been scanned by our scanner. Skipping new scan.\n", ref)
-		return false
+		versionRequired = false
 	}
 
-	return true
+	hubRequired := true
+	hubHost, ok := annotations[scannerHubServerLabel]
+	if ok && (strings.Compare(hubHost, a.HubServer) == 0) {
+		log.Printf("Image %s has been scanned by our Hub server. Skipping new scan.\n", ref)
+		hubRequired = false
+	}
+
+	if versionRequired || hubRequired {
+		return true
+	}
+
+	return false
 }

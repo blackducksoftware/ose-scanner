@@ -24,6 +24,7 @@ package controller
 
 import (
 	"log"
+	"time"
 )
 
 type Worker struct {
@@ -31,14 +32,16 @@ type Worker struct {
 	jobQueue   chan Job
 	workerPool chan chan Job
 	quit       chan bool
+	arbiter    *Arbiter
 }
 
-func NewWorker(index int, workerPool chan chan Job) Worker {
+func NewWorker(index int, workerPool chan chan Job, arbiter *Arbiter) Worker {
 	return Worker{
 		id:         index,
 		workerPool: workerPool,
 		jobQueue:   make(chan Job),
 		quit:       make(chan bool),
+		arbiter:    arbiter,
 	}
 }
 
@@ -51,9 +54,8 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.jobQueue:
-				if err := job.ScanImage.scan(); err != nil {
-					log.Printf("Error scanning image: %s", err.Error())
-				}
+				w.RequestScanAuthorization(job)
+
 				job.Done()
 
 			case <-w.quit:
@@ -63,4 +65,65 @@ func (w Worker) Start() {
 			}
 		}
 	}()
+}
+
+func (w Worker) RequestScanAuthorization(job Job) {
+
+	spec := job.ScanImage.digest
+
+	log.Printf("Requesting authorization to scan image %s\n", spec)
+
+	if !job.ScanImage.exists() {
+		log.Printf("Image %s not in local Docker engine. Skipping scan.\n", spec)
+		return
+	}
+
+	for {
+		connected := w.arbiter.heartbeat()
+		if connected {
+			break
+		}
+
+		log.Printf("Arbiter peer offline. Postponing scan of image: %s\n", spec)
+		// in the real world we shouldn't ever be offline from our arbiter
+		time.Sleep(time.Second * 30)
+		continue
+	}
+
+	_, skip := w.arbiter.alertImage(spec)
+
+	if skip {
+		log.Printf("Skipping scan of image at arbiter direction: %s\n", spec)
+		return
+	}
+
+	for {
+		requestHash, skip, startScan := w.arbiter.requestImage(spec)
+
+		if skip {
+			log.Printf("Skipping scan of image at arbiter direction: %s\n", spec)
+			break
+		}
+
+		if !startScan {
+			time.Sleep(time.Second * 30)
+			continue
+		}
+
+		log.Printf("Starting scan of %s with arbiter hash of %s\n", spec, requestHash)
+
+		err := job.ScanImage.scan()
+		if err != nil {
+			log.Printf("Scan image error for %s of %s\n", spec, err)
+			w.arbiter.abortScan(requestHash) // abort will return the item to the arbiter queue, but remove it from ours
+			break
+		}
+
+		w.arbiter.scanDone(requestHash)
+		break
+	}
+
+	log.Printf("Completed processing for image %s\n", spec)
+	return
+
 }

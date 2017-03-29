@@ -27,6 +27,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
 	_ "github.com/openshift/origin/pkg/api/install"
@@ -87,7 +88,12 @@ func main() {
 	done := make(chan struct{})
 	defer close(done)
 
-	c.Start()
+	controllerId, _ := os.Hostname()
+	arbiterUrl := "http://scan-arbiter.blackduck:9035"
+
+	arbiter := controller.NewArbiter(arbiterUrl, hub.Workers, controllerId)
+
+	c.Start(arbiter)
 
 	c.Load(done)
 
@@ -117,7 +123,6 @@ func init() {
 }
 
 func checkExpectedCmdlineParams() bool {
-	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
 	if hub.Config.Host == "REQUIRED" {
 		val := os.Getenv("BDS_HOST")
@@ -189,7 +194,12 @@ func checkExpectedCmdlineParams() bool {
 		hub.Workers = number
 	}
 
-	hub.Config.Url = fmt.Sprintf("%s://%s", hub.Config.Scheme, hub.Config.Host)
+	if (strings.Compare(strings.ToLower(hub.Config.Scheme), "http") == 0 && strings.Compare(hub.Config.Port, "80") == 0) ||
+		(strings.Compare(strings.ToLower(hub.Config.Scheme), "https") == 0 && strings.Compare(hub.Config.Port, "443") == 0) {
+		hub.Config.Url = fmt.Sprintf("%s://%s", hub.Config.Scheme, hub.Config.Host)
+	} else {
+		hub.Config.Url = fmt.Sprintf("%s://%s:%s", hub.Config.Scheme, hub.Config.Host, hub.Config.Port)
+	}
 
 	return true
 }

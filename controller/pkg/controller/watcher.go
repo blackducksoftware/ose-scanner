@@ -148,8 +148,16 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 		return
 	}
 
-	for tag, events := range tags {
-		digest := events.Items[0].Image
-		log.Printf("Image %s deleted with digest %s\n", tag, digest)
+	digest := is.Spec.DockerImageRepository
+
+	for _, events := range tags {
+		ref := events.Items[0].Image
+		_, err := w.openshiftClient.Images().Get(ref)
+		if err != nil {
+			log.Printf("Error seeking deleted image %s@%s: %s\n", digest, ref, err)
+			continue
+		}
+
+		log.Printf("Image %s deleted with digest %s\n", ref, digest)
 	}
 }

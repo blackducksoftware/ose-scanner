@@ -53,6 +53,23 @@ type HubConfig struct {
 	Password string `json:"password"`
 }
 
+type codeLocationStruct struct {
+	Type                 string    `json:"type"`
+	Name                 string    `json:"name"`
+	URL                  string    `json:"url"`
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+	MappedProjectVersion string    `json:"mappedProjectVersion"`
+	Meta                 struct {
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
+}
+
 type codeLocationsStruct struct {
 	TotalCount int `json:"totalCount"`
 	Items      []struct {
@@ -76,6 +93,20 @@ type codeLocationsStruct struct {
 		Links []interface{} `json:"links"`
 	} `json:"_meta"`
 	AppliedFilters []interface{} `json:"appliedFilters"`
+}
+
+type scanSummaryStruct struct {
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+	Meta      struct {
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type codeLocationsScanSummariesStruct struct {
@@ -116,6 +147,21 @@ type projectsStruct struct {
 			} `json:"links"`
 		} `json:"_meta"`
 	} `json:"items"`
+}
+
+type projectVersionStruct struct {
+	VersionName  string `json:"versionName"`
+	Phase        string `json:"phase"`
+	Distribution string `json:"distribution"`
+	Source       string `json:"source"`
+	Meta         struct {
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
 }
 
 type projectVersionsStruct struct {
@@ -184,6 +230,20 @@ type riskProfileStruct struct {
 	} `json:"_meta"`
 }
 
+type policyStatusStruct struct {
+	OverallStatus                string    `json:"overallStatus"`
+	UpdatedAt                    time.Time `json:"updatedAt"`
+	ComponentVersionStatusCounts []struct {
+		Name  string `json:"name"`
+		Value int    `json:"value"`
+	} `json:"componentVersionStatusCounts"`
+	Meta struct {
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
+}
+
 type HubServer struct {
 	client *http.Client
 	Config *HubConfig
@@ -222,7 +282,7 @@ func (h *HubServer) login() bool {
 		return false
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded") // needed this the prevend 401 Unauthorized
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded") // needed this the prevent 401 Unauthorized
 
 	resp, err := h.client.Do(req)
 	if err != nil {
@@ -235,6 +295,25 @@ func (h *HubServer) login() bool {
 		return false
 	}
 	return true
+}
+
+func (h *HubServer) getCodeLocation(apiUrl string) (*codeLocationStruct, bool) {
+
+	log.Println(apiUrl)
+
+	var codeLocation codeLocationStruct
+
+	buf := h.getHubRestEndPointJson(apiUrl)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", apiUrl)
+		return &codeLocation, false
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &codeLocation); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+		return &codeLocation, false
+	}
+	return &codeLocation, true
 }
 
 func (h *HubServer) findCodeLocations(searchCriterea string) *codeLocationsStruct {
@@ -272,6 +351,27 @@ func (h *HubServer) findCodeLocationScanSummaries(url string) *codeLocationsScan
 	return &codeLocationsScanSummaries
 }
 
+func (h *HubServer) getScanSummary(scanId string) (*scanSummaryStruct, bool) {
+	apiUrl := fmt.Sprintf("%s/api/scan-summaries/%s", h.Config.Url, scanId)
+
+	log.Println(apiUrl)
+
+	var scanSummary scanSummaryStruct
+
+	buf := h.getHubRestEndPointJson(apiUrl)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", apiUrl)
+		return &scanSummary, false
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &scanSummary); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+		return &scanSummary, false
+	}
+
+	return &scanSummary, true
+}
+
 func (h *HubServer) findProjects(projectName string) *projectsStruct {
 	searchCriterea := "name:" + projectName
 	searchStr := url.QueryEscape(searchCriterea)
@@ -289,6 +389,25 @@ func (h *HubServer) findProjects(projectName string) *projectsStruct {
 		log.Printf("ERROR Unmarshall error: %s\n", err)
 	}
 	return &projects
+}
+
+func (h *HubServer) getProjectVersion(apiUrl string) (*projectVersionStruct, bool) {
+
+	log.Println(apiUrl)
+
+	var projectVersion projectVersionStruct
+
+	buf := h.getHubRestEndPointJson(apiUrl)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", apiUrl)
+		return &projectVersion, false
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &projectVersion); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+		return &projectVersion, false
+	}
+	return &projectVersion, true
 }
 
 func (h *HubServer) findProjectVersions(projectId string, projectVersion string) *projectVersionsStruct {
@@ -310,21 +429,42 @@ func (h *HubServer) findProjectVersions(projectId string, projectVersion string)
 	return &projectVersions
 }
 
-func (h *HubServer) getRiskProfile(url string) *riskProfileStruct {
+func (h *HubServer) getRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
 
-	log.Println(url)
+	log.Println(apiUrl)
 
 	var riskProfile riskProfileStruct
 
-	buf := h.getHubRestEndPointJson(url)
+	buf := h.getHubRestEndPointJson(apiUrl)
 	if buf.Len() == 0 {
-		log.Printf("Error no response for url: %s\n", url)
+		log.Printf("Error no response for url: %s\n", apiUrl)
+		return &riskProfile, false
 	}
 
 	if err := json.Unmarshal([]byte(buf.String()), &riskProfile); err != nil {
 		log.Printf("ERROR Unmarshall error: %s\n", err)
+		return &riskProfile, false
 	}
-	return &riskProfile
+	return &riskProfile, true
+}
+
+func (h *HubServer) getPolicyStatus(apiUrl string) (*policyStatusStruct, bool) {
+
+	log.Println(apiUrl)
+
+	var policyStatus policyStatusStruct
+
+	buf := h.getHubRestEndPointJson(apiUrl)
+	if buf.Len() == 0 {
+		log.Printf("Error no response for url: %s\n", apiUrl)
+		return &policyStatus, false
+	}
+
+	if err := json.Unmarshal([]byte(buf.String()), &policyStatus); err != nil {
+		log.Printf("ERROR Unmarshall error: %s\n", err)
+		return &policyStatus, false
+	}
+	return &policyStatus, true
 }
 
 func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer {
@@ -336,6 +476,7 @@ func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer
 		return buf
 	}
 	log.Printf("Endpoint status %s\n", resp.Status)
+
 	if resp.StatusCode != 200 {
 		log.Printf("ERROR return status : %s url:%s\n", resp.Status, restEndPointUrl)
 		return buf

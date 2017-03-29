@@ -40,10 +40,10 @@ func NewDispatcher(jobQueue chan Job, maxWorkers int) *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) Run() {
+func (d *Dispatcher) Run(arb *Arbiter) {
 	// starting n number of workers
 	for i := 0; i < d.maxWorkers; i++ {
-		worker := NewWorker(i+1, d.workerPool)
+		worker := NewWorker(i+1, d.workerPool, arb)
 		worker.Start()
 	}
 

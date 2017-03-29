@@ -80,11 +80,12 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 	}
 }
 
-func (c *Controller) Start() {
+func (c *Controller) Start(arb *Arbiter) {
 
 	log.Println("Starting controller ....")
 	dispatcher := NewDispatcher(c.jobQueue, Hub.Workers)
-	dispatcher.Run()
+	arb.heartbeat()
+	dispatcher.Run(arb)
 
 	return
 }
