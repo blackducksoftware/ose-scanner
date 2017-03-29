@@ -13,7 +13,7 @@ all:
 
 travis:
 	mkdir output
-	GOOS=linux GOARCH=amd64 go build -o ./output/ose_arbiter .
+	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/ose_arbiter ./cmd/arbiter
 
 vet:
 	go fmt ${PKG_LIST}
