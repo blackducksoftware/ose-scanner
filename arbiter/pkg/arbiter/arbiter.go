@@ -26,6 +26,9 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
+
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	osclient "github.com/openshift/origin/pkg/client"
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
@@ -38,7 +41,7 @@ import (
 )
 
 type HubParams struct {
-	Config  *HubConfig
+	Config  *bdscommon.HubConfig
 	Version string
 }
 
@@ -56,7 +59,7 @@ type Arbiter struct {
 	images            map[string]*ScanImage
 	requestedImages   map[string]string
 	assignedImages    map[string]*assignImage
-	annotation        *Annotator
+	annotation        *bdscommon.Annotator
 	sync.RWMutex
 }
 
@@ -80,7 +83,7 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 		requestedImages:   make(map[string]string),
 		assignedImages:    make(map[string]*assignImage),
 		controllerDaemons: make(map[string]*controllerDaemon),
-		annotation:        NewAnnotator(os, hub.Version, hub.Config.Host),
+		annotation:        bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
 	}
 }
 
@@ -89,6 +92,14 @@ func (arb *Arbiter) Start() {
 	log.Println("Starting arbiter ....")
 	dispatcher := NewDispatcher(arb.jobQueue)
 	dispatcher.Run()
+
+	ticker := time.NewTicker(time.Minute * 30)
+	go func() {
+		for t := range ticker.C {
+			log.Println("Processing notification status at: ", t)
+			arb.queueImagesForNotification()
+		}
+	}()
 
 	return
 }
@@ -120,6 +131,8 @@ func (arb *Arbiter) Load(done <-chan struct{}) {
 
 	arb.getImages(done)
 
+	arb.queueImagesForNotification()
+
 	log.Println("Done load of existing images.")
 
 	return
@@ -134,14 +147,14 @@ func (arb *Arbiter) addImage(ID string, Reference string) {
 	if !ok {
 
 		imageItem := newScanImage(ID, Reference, arb.annotation)
-
+		log.Printf("Added %s to image map\n", imageItem.digest)
 		arb.images[Reference] = imageItem
 	}
 }
 
 func (arb *Arbiter) queueImagesForNotification() {
 	for _, image := range arb.images {
-		log.Printf("Added %s to notification map\n", image.digest)
+		log.Printf("Queuing %s for notificaiton check\n", image.digest)
 		job := Job{
 			ScanImage: image,
 			arbiter:   arb,
@@ -178,9 +191,9 @@ func (arb *Arbiter) getImages(done <-chan struct{}) {
 // ValidateConfig validates if the Hub server configuration is valid. A login attempt will be performed.
 func (arb *Arbiter) ValidateConfig() bool {
 
-	hubServer := HubServer{Config: Hub.Config}
+	hubServer := bdscommon.HubServer{Config: Hub.Config}
 
-	return hubServer.login()
+	return hubServer.Login()
 
 }
 

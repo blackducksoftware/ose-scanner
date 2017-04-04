@@ -51,9 +51,22 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.jobQueue:
-				/*if err := job.ScanImage.scan(); err != nil {
-					log.Printf("Error scanning image: %s", err.Error())
-				}*/
+				ok, info := job.GetAnnotationInfo()
+				if !ok {
+					log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
+				}
+
+				err, results := job.ScanImage.versionResults(info)
+				if err != nil {
+					log.Printf("Error getting notification results for %s: %s", job.ScanImage.digest, err.Error())
+				}
+
+				if ok && err == nil {
+					ok = job.UpdateAnnotationInfo(results)
+					if ok {
+						log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
+					}
+				}
 				job.Done()
 
 			case <-w.quit:

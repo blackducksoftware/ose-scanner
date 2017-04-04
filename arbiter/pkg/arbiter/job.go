@@ -23,6 +23,7 @@ under the License.
 package arbiter
 
 import (
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 	"log"
 )
 
@@ -40,4 +41,46 @@ func (job Job) Load() {
 	job.arbiter.wait.Add(1)
 	log.Println("Queue image: " + job.ScanImage.taggedName)
 	return
+}
+
+func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
+	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
+	if err != nil {
+		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
+		return false, info
+	}
+
+	info.Annotations = image.ObjectMeta.Annotations
+	if info.Annotations == nil {
+		log.Printf("Image %s has no annotations - creating.\n", job.ScanImage.sha)
+		info.Annotations = make(map[string]string)
+	}
+
+	info.Labels = image.ObjectMeta.Labels
+	if info.Labels == nil {
+		log.Printf("Image %s has no labels - creating.\n", job.ScanImage.sha)
+		info.Labels = make(map[string]string)
+	}
+
+	return true, info
+}
+
+func (job Job) UpdateAnnotationInfo(info bdscommon.ImageInfo) bool {
+	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
+	if err != nil {
+		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
+		return false
+	}
+
+	image.ObjectMeta.Annotations = info.Annotations
+
+	image.ObjectMeta.Labels = info.Labels
+
+	image, err = job.arbiter.openshiftClient.Images().Update(image)
+	if err != nil {
+		log.Printf("Error updating image: %s. %s\n", job.ScanImage.sha, err)
+		return false
+	}
+
+	return true
 }

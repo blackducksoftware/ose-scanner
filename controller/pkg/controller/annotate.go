@@ -23,7 +23,6 @@ under the License.
 package controller
 
 import (
-	//	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"

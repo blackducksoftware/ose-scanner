@@ -26,7 +26,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	//"strconv"
+	"strings"
+
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	"github.com/blackducksoftware/ose-scanner/arbiter/pkg/arbiter"
 	_ "github.com/openshift/origin/pkg/api/install"
@@ -100,7 +102,7 @@ func init() {
 
 	log.Printf("Initializing Black Duck arbiter with version %s\n", bds_version)
 
-	hub.Config = &arbiter.HubConfig{}
+	hub.Config = &bdscommon.HubConfig{}
 
 	hub.Version = bds_version
 
@@ -113,7 +115,6 @@ func init() {
 }
 
 func checkExpectedCmdlineParams() bool {
-	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
 	if hub.Config.Host == "REQUIRED" {
 		val := os.Getenv("BDS_HOST")
@@ -165,7 +166,12 @@ func checkExpectedCmdlineParams() bool {
 		hub.Config.Password = val
 	}
 
-	hub.Config.Url = fmt.Sprintf("%s://%s:%s", hub.Config.Scheme, hub.Config.Host, hub.Config.Port)
+	if (strings.Compare(strings.ToLower(hub.Config.Scheme), "http") == 0 && strings.Compare(hub.Config.Port, "80") == 0) ||
+		(strings.Compare(strings.ToLower(hub.Config.Scheme), "https") == 0 && strings.Compare(hub.Config.Port, "443") == 0) {
+		hub.Config.Url = fmt.Sprintf("%s://%s", hub.Config.Scheme, hub.Config.Host)
+	} else {
+		hub.Config.Url = fmt.Sprintf("%s://%s:%s", hub.Config.Scheme, hub.Config.Host, hub.Config.Port)
+	}
 
 	return true
 }
