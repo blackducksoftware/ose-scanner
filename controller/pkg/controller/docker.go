@@ -53,12 +53,49 @@ func (d Docker) imageExists(image string) bool {
 
 }
 
+func (d Docker) loadScanner (scanner string) (error) {
+	if d.imageExists (scanner) {
+		log.Println("Scanner found")
+		return nil
+	}
+
+	loc := strings.LastIndex (scanner, ":") // we know there is always a : to sep the tag because we put it there
+
+	image := scanner[:loc]
+	tag := scanner[loc+1:]
+
+
+	opts := docker.PullImageOptions{
+	        Repository: image,
+		Tag: tag,
+    	}
+
+	auth := docker.AuthConfiguration{}
+
+	log.Printf ("Attempting to pull scanner [%s] [%s]\n", image, tag)
+
+	err := d.client.PullImage(opts, auth)
+
+	if err != nil {
+		log.Printf("Error pulling image %s: %s\n", scanner, err)
+		return err
+	}
+
+	return nil
+}
+
 func (d Docker) launchContainer(scanner string, args []string) (ScanResult, error) {
+
+	emptyScanResult := ScanResult{completed: false, scanId: ""}
+
+	err := d.loadScanner(scanner)
+	if err != nil {
+		log.Printf("Error loading scan container %s: %s\n", scanner, err)
+		return emptyScanResult, err
+	}
 
 	binds := []string{}
 	binds = append(binds, "/var/run/docker.sock:/var/run/docker.sock")
-
-	emptyScanResult := ScanResult{completed: false, scanId: ""}
 
 	container, err := d.client.CreateContainer(
 		docker.CreateContainerOptions{
@@ -76,7 +113,7 @@ func (d Docker) launchContainer(scanner string, args []string) (ScanResult, erro
 		})
 
 	if err != nil {
-		log.Printf("Error creating container %s: %s\n", scanner, err)
+		log.Printf("Error creating scan container %s: %s\n", scanner, err)
 		return emptyScanResult, err
 	}
 
@@ -89,7 +126,7 @@ func (d Docker) launchContainer(scanner string, args []string) (ScanResult, erro
 	err = d.client.StartContainer(container.ID, &docker.HostConfig{Privileged: true})
 
 	if err != nil {
-		log.Printf("Error starting container ID %s for %s: %s\n", d.shortID, scanner, err)
+		log.Printf("Error starting scan container ID %s for %s: %s\n", d.shortID, scanner, err)
 		return emptyScanResult, err
 	}
 
@@ -98,7 +135,7 @@ func (d Docker) launchContainer(scanner string, args []string) (ScanResult, erro
 	exit, err := d.client.WaitContainer(container.ID) // block until done (logs in pipeOutput)
 
 	if err != nil {
-		log.Printf("Error waiting container ID %s with exit %d: %s\n", d.shortID, exit, err)
+		log.Printf("Error waiting scan container ID %s with exit %d: %s\n", d.shortID, exit, err)
 		return emptyScanResult, err
 	} else {
 		log.Printf("Scan container %s exit with status %d\n", d.shortID, exit)
@@ -112,7 +149,7 @@ func (d Docker) launchContainer(scanner string, args []string) (ScanResult, erro
 	err = d.client.RemoveContainer(options)
 
 	if err != nil {
-		log.Printf("Error removing container ID %s: %s\n", d.shortID, err)
+		log.Printf("Error removing scan container ID %s: %s\n", d.shortID, err)
 		return emptyScanResult, err
 	}
 

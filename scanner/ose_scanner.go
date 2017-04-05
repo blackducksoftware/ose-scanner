@@ -319,7 +319,32 @@ func checkExpectedEnvVars() bool {
 	return true
 }
 
+func healthy(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+func validatePreCacheMode() {
+	val := os.Getenv("BDS_LISTEN")
+	if val != "9036" {
+		// flag wasn't set, so not in pre-cache mode
+		fmt.Println ("Precache flag missing. Configuring normal mode.")
+		return
+	}
+
+	fmt.Println ("Operating in pre-cache mode.")
+
+	http.HandleFunc("/health", healthy)      // set router
+	err := http.ListenAndServe(":9036", nil) // set listen port
+
+	if err != nil {
+		log.Fatal("validatePreCacheMode: ", err)
+	}
+}
+
 func main() {
+
+	validatePreCacheMode()
+
 	// check input arguments
 	flag.Parse() // Scan the arguments list
 

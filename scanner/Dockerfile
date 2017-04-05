@@ -24,7 +24,5 @@ LABEL vendor="Black Duck Software" \
       com.blackducksoftware.platform.version="${bds_ver}" \
       com.blackducksoftware.platform.component="Hub Scanner" 
 
-# Clear any existing entry points
-ENTRYPOINT []
-#ENTRYPOINT [ "/ose_scanner" ]
-#CMD [ "-?" ]
+ENTRYPOINT [ "/ose_scanner" ]
+EXPOSE 9036
