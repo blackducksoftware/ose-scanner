@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
 	_ "github.com/openshift/origin/pkg/api/install"
 	osclient "github.com/openshift/origin/pkg/client"
@@ -109,7 +110,7 @@ func init() {
 
 	log.Printf("Initializing Black Duck scan controller version %s\n", bds_version)
 
-	hub.Config = &controller.HubConfig{}
+	hub.Config = &bdscommon.HubConfig{}
 
 	hub.Version = bds_version
 

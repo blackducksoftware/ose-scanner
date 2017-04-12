@@ -139,7 +139,7 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 }
 
 func ProjectVersionResults (info ImageInfo, imageId string, taggedName string, sha string, scanId string, projectVersionUrl string, hub *HubServer, annotate *Annotator ) (e error, results ImageInfo) {
-	log.Printf("processing vulnerabilities and policy violations for %s:%s\n", taggedName, imageId[:10])
+	log.Printf("Processing vulnerabilities and policy violations for %s:%s\n", taggedName, imageId[:10])
 
 	projectVersion, ok := hub.GetProjectVersion(projectVersionUrl)
 	if !ok {

@@ -53,26 +53,25 @@ func (d Docker) imageExists(image string) bool {
 
 }
 
-func (d Docker) loadScanner (scanner string) (error) {
-	if d.imageExists (scanner) {
+func (d Docker) loadScanner(scanner string) error {
+	if d.imageExists(scanner) {
 		log.Println("Scanner found")
 		return nil
 	}
 
-	loc := strings.LastIndex (scanner, ":") // we know there is always a : to sep the tag because we put it there
+	loc := strings.LastIndex(scanner, ":") // we know there is always a : to sep the tag because we put it there
 
 	image := scanner[:loc]
 	tag := scanner[loc+1:]
 
-
 	opts := docker.PullImageOptions{
-	        Repository: image,
-		Tag: tag,
-    	}
+		Repository: image,
+		Tag:        tag,
+	}
 
 	auth := docker.AuthConfiguration{}
 
-	log.Printf ("Attempting to pull scanner [%s] [%s]\n", image, tag)
+	log.Printf("Attempting to pull scanner [%s] [%s]\n", image, tag)
 
 	err := d.client.PullImage(opts, auth)
 

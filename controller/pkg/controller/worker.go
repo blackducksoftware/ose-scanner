@@ -110,13 +110,25 @@ func (w Worker) RequestScanAuthorization(job Job) {
 			continue
 		}
 
+		ok, info := job.GetAnnotationInfo()
+		if !ok {
+			log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
+		}
+
 		log.Printf("Starting scan of %s with arbiter hash of %s\n", spec, requestHash)
 
-		err := job.ScanImage.scan()
+		err, results := job.ScanImage.scan(info)
 		if err != nil {
 			log.Printf("Scan image error for %s of %s\n", spec, err)
 			w.arbiter.abortScan(requestHash) // abort will return the item to the arbiter queue, but remove it from ours
 			break
+		}
+
+		if ok && err == nil {
+			ok = job.UpdateAnnotationInfo(results)
+			if ok {
+				log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
+			}
 		}
 
 		w.arbiter.scanDone(requestHash)

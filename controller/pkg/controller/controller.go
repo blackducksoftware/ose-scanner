@@ -27,6 +27,8 @@ import (
 	"os"
 	"sync"
 
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+
 	osclient "github.com/openshift/origin/pkg/client"
 	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
 
@@ -38,7 +40,7 @@ import (
 )
 
 type HubParams struct {
-	Config  *HubConfig
+	Config  *bdscommon.HubConfig
 	Scanner string
 	Workers int
 	Version string
@@ -55,7 +57,7 @@ type Controller struct {
 	jobQueue        chan Job
 	wait            sync.WaitGroup
 	images          map[string]*ScanImage
-	annotation      *Annotator
+	annotation      *bdscommon.Annotator
 	sync.RWMutex
 }
 
@@ -76,7 +78,7 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		f:               f,
 		jobQueue:        jobQueue,
 		images:          make(map[string]*ScanImage),
-		annotation:      NewAnnotator(os, hub.Version, hub.Config.Host),
+		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
 	}
 }
 
@@ -132,18 +134,24 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 		imageItem := newScanImage(ID, Reference, c.annotation)
 
-		if !c.annotation.IsScanNeeded(imageItem.sha) {
-			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
-			// return
-		}
-
 		c.images[Reference] = imageItem
 
-		log.Printf("Added %s to image map\n", imageItem.digest)
 		job := Job{
 			ScanImage:  imageItem,
 			controller: c,
 		}
+		
+		ok, info := job.GetAnnotationInfo()
+		if !ok {
+			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
+		}
+
+		if !c.annotation.IsScanNeeded(info, imageItem.sha) {
+			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
+			return
+		}
+
+		log.Printf("Added %s to image map\n", imageItem.digest)
 
 		job.Load()
 		c.jobQueue <- job
@@ -176,9 +184,9 @@ func (c *Controller) getImages(done <-chan struct{}) {
 
 func (c *Controller) ValidateConfig() bool {
 
-	hubServer := HubServer{Config: Hub.Config}
+	hubServer := bdscommon.HubServer{Config: Hub.Config}
 
-	return hubServer.login()
+	return hubServer.Login()
 
 }
 
