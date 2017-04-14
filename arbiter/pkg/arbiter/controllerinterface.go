@@ -89,6 +89,7 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 
 	cd, ok := arb.controllerDaemons[ci.Id]
 	if !ok {
+		log.Printf("Unknown controller [%s] claimed abort for image: %s\n", ci.Id, imageHash)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
@@ -96,6 +97,7 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 
 	image, ok := arb.assignedImages[imageHash]
 	if !ok {
+		log.Printf("Controller [%s] claimed abort on unknown image: %s\n", ci.Id, imageHash)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
@@ -104,6 +106,8 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 	arb.releaseScanForPeer(image, cd)
 
 	w.WriteHeader(http.StatusOK)
+
+	log.Println("Done scanAbort")
 
 }
 
@@ -127,6 +131,7 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 
 	cd, ok := arb.controllerDaemons[ci.Id]
 	if !ok {
+		log.Printf("Unknown controller [%s] claimed done for image: %s\n", ci.Id, imageHash)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
@@ -134,6 +139,7 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 
 	image, ok := arb.assignedImages[imageHash]
 	if !ok {
+		log.Printf("Controller [%s] claimed done on unknown image: %s\n", ci.Id, imageHash)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
@@ -144,6 +150,8 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 	delete(arb.assignedImages, imageHash)
 
 	w.WriteHeader(http.StatusOK)
+
+	log.Println("Done scanDone")
 
 }
 
@@ -185,6 +193,7 @@ func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {
 
 	image, ok := arb.assignedImages[imageHash]
 	if !ok {
+		log.Printf("Controller [%s] claimed processing unknown image: %s\n", ci.Id, imageHash)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
@@ -193,6 +202,8 @@ func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {
 	image.UpdateTime = time.Now()
 
 	w.WriteHeader(http.StatusOK)
+
+	log.Println("Done processingImage")
 
 }
 
@@ -203,7 +214,7 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
 	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
-		log.Printf("Got junk on foundImage API\n")
+		log.Printf("Got junk on assignScan API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -225,7 +236,7 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-
+	log.Println("Done assignScan")
 }
 
 func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool, bool) {
@@ -264,7 +275,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
 	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
-		log.Printf("Got junk on foundImage API\n")
+		log.Printf("Got junk on foundImage API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -288,6 +299,8 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
+
+	log.Println("Done foundImage")
 
 }
 
@@ -317,7 +330,7 @@ func (arb *Arbiter) registerControllerAlive(w http.ResponseWriter, r *http.Reque
 	_ = json.NewDecoder(r.Body).Decode(&ci)
 
 	if len(ci.Id) == 0 {
-		log.Printf("Got junk on registerControllerAlive API\n")
+		log.Printf("Got junk on registerControllerAlive API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
