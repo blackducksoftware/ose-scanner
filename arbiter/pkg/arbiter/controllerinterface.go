@@ -216,6 +216,7 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
 		log.Printf("Got junk on assignScan API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
 		return
 	}
 
@@ -249,6 +250,14 @@ func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool,
 		log.Printf("Requested image %s isn't in queue\n", spec)
 		return "", false, true
 	}
+
+	assignedImage, ok := arb.assignedImages[reqHash]
+	if ok {
+		// need to check if previously assigned to another controller -- avoids dup scan as well as worker exhaustion
+		log.Printf("Requested image %s is currently assigned to %s\n", spec, assignedImage.ControllerID)
+		return "", false, false
+	}
+
 
 	if !cd.AssignScan(spec) {
 		// we've probably run out of workers, but could be a data error. the latter ges cleaned up once scan is done on legit node

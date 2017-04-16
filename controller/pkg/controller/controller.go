@@ -140,13 +140,13 @@ func (c *Controller) AddImage(ID string, Reference string) {
 			ScanImage:  imageItem,
 			controller: c,
 		}
-		
+
 		ok, info := job.GetAnnotationInfo()
 		if !ok {
 			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
 		}
 
-		if !c.annotation.IsScanNeeded(info, imageItem.sha) {
+		if !c.annotation.IsScanNeeded(info, imageItem.sha, Hub.Config) {
 			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
 			return
 		}

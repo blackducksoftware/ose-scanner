@@ -26,9 +26,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
-
 	//kapi "k8s.io/kubernetes/pkg/api"
-
 	//osclient "github.com/openshift/origin/pkg/client"
 )
 
@@ -38,12 +36,12 @@ const ScannerScanId = "blackducksoftware.com/scan-id"
 const ScannerProjectVersionUrl = "blackducksoftware.com/project-endpoint"
 
 type Annotator struct {
-	ScannerVersion  string
-	HubServer       string
+	ScannerVersion string
+	HubServer      string
 }
 
 type ImageInfo struct {
-	Labels map[string]string
+	Labels      map[string]string
 	Annotations map[string]string
 }
 
@@ -51,14 +49,14 @@ type ImageInfo struct {
 func NewAnnotator(ScannerVersion string, HubServer string) *Annotator {
 
 	wc := &Annotator{
-		ScannerVersion:  ScannerVersion,
-		HubServer:       HubServer,
+		ScannerVersion: ScannerVersion,
+		HubServer:      HubServer,
 	}
 	return wc
 }
 
 // UpdateAnnotations updates the image annotations and labels with the current scan results
-func (a *Annotator) UpdateAnnotations(info ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string) (ImageInfo) {
+func (a *Annotator) UpdateAnnotations(info ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string) ImageInfo {
 
 	policy := "None"
 	hasPolicyViolations := "false"
@@ -108,7 +106,7 @@ func (a *Annotator) UpdateAnnotations(info ImageInfo, ref string, violations int
 }
 
 // Determine if a scan of the specified image is required
-func (a *Annotator) IsScanNeeded(info ImageInfo, ref string) bool {
+func (a *Annotator) IsScanNeeded(info ImageInfo, ref string, hubConfig *HubConfig) bool {
 
 	annotations := info.Annotations
 	if annotations == nil {
@@ -120,18 +118,26 @@ func (a *Annotator) IsScanNeeded(info ImageInfo, ref string) bool {
 	versionRequired := true
 	bdsVer, ok := annotations[scannerVersionLabel]
 	if ok && (strings.Compare(bdsVer, a.ScannerVersion) == 0) {
-		log.Printf("Image %s has been scanned by our scanner. Skipping new scan.\n", ref)
+		log.Printf("Image %s has been scanned by our scanner.\n", ref)
 		versionRequired = false
 	}
 
 	hubRequired := true
 	hubHost, ok := annotations[scannerHubServerLabel]
 	if ok && (strings.Compare(hubHost, a.HubServer) == 0) {
-		log.Printf("Image %s has been scanned by our Hub server. Skipping new scan.\n", ref)
+		log.Printf("Image %s has been scanned by our Hub server.\n", ref)
 		hubRequired = false
 	}
 
-	if versionRequired || hubRequired {
+	projectVersionRescan := true
+	projectVersionUrl, ok := annotations[ScannerProjectVersionUrl]
+	if ok && ValidateGetProjectVersion(projectVersionUrl, hubConfig) {
+		log.Printf("Image %s is present at url %s.\n", ref, projectVersionUrl)
+		projectVersionRescan = false
+	}
+
+	if versionRequired || hubRequired || projectVersionRescan {
+		log.Printf("Image %s scan required due to missing or invalid configuration\n", ref)
 		return true
 	}
 

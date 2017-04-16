@@ -23,8 +23,8 @@ under the License.
 package controller
 
 import (
-	"log"
 	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+	"log"
 )
 
 type Job struct {
