@@ -90,7 +90,7 @@ func main() {
 	defer close(done)
 
 	controllerId, _ := os.Hostname()
-	arbiterUrl := "http://scan-arbiter.blackduck:9035"
+	arbiterUrl := "http://scan-arbiter.blackduck-scan:9035"
 
 	arbiter := controller.NewArbiter(arbiterUrl, hub.Workers, controllerId)
 

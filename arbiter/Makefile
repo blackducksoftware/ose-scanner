@@ -5,15 +5,19 @@ all:
 	#clean up from the past
 	rm -Rf ./output \
 	mkdir output
-
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/ose_arbiter ./cmd/arbiter
+	#Assumes build on Cent/RHEL7.x
+	cp /etc/ssl/certs/ca-bundle.crt ca-certificates.crt
+	
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/ose_arbiter ./cmd/arbiter
 	
 	docker build --rm --build-arg bds_ver=$(BDS_SCANNER) -t hub_ose_arbiter:$(BDS_SCANNER) -f Dockerfile .
 	docker save hub_ose_arbiter:$(BDS_SCANNER) > ./output/hub_ose_arbiter.tar
 
 travis:
 	mkdir output
-	GOOS=linux GOARCH=amd64 go build -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/ose_arbiter ./cmd/arbiter
+	# Travis isn't executing tests at this point
+	#cp /etc/pki/ca-trust/extracted/openssl/ca-bundle.trust.crt ca-certificates.crt
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/ose_arbiter ./cmd/arbiter
 
 vet:
 	go fmt ${PKG_LIST}

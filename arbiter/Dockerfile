@@ -1,11 +1,11 @@
-FROM projectatomic/atomicapp
-MAINTAINER Black Duck Hub Team
+FROM scratch
 
-RUN yum -y update && yum clean all
+MAINTAINER Black Duck Hub Team
 
 ARG bds_ver
 
 COPY ./output/ose_arbiter /ose_arbiter
+COPY ./ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 LABEL vendor="Black Duck Software" \
       com.blackducksoftware.version="${bds_ver}" \

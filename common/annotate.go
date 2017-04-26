@@ -26,8 +26,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	//kapi "k8s.io/kubernetes/pkg/api"
-	//osclient "github.com/openshift/origin/pkg/client"
 )
 
 const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
