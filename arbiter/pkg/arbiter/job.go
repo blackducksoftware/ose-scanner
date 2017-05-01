@@ -52,35 +52,53 @@ func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 
 	info.Annotations = image.ObjectMeta.Annotations
 	if info.Annotations == nil {
-		log.Printf("Image %s has no annotations - creating.\n", job.ScanImage.sha)
+		log.Printf("Image %s has no annotations - creating object.\n", job.ScanImage.sha)
 		info.Annotations = make(map[string]string)
 	}
 
 	info.Labels = image.ObjectMeta.Labels
 	if info.Labels == nil {
-		log.Printf("Image %s has no labels - creating.\n", job.ScanImage.sha)
+		log.Printf("Image %s has no labels - creating object.\n", job.ScanImage.sha)
 		info.Labels = make(map[string]string)
 	}
 
 	return true, info
 }
 
-func (job Job) UpdateAnnotationInfo(info bdscommon.ImageInfo) bool {
+func (job Job) UpdateAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
 	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false
 	}
 
-	image.ObjectMeta.Annotations = info.Annotations
+	_, oldInfo := job.GetAnnotationInfo()
 
-	image.ObjectMeta.Labels = info.Labels
+	results := job.MergeAnnotationResults(oldInfo, newInfo)
+
+	image.ObjectMeta.Annotations = results.Annotations
+
+	image.ObjectMeta.Labels = results.Labels
 
 	image, err = job.arbiter.openshiftClient.Images().Update(image)
 	if err != nil {
-		log.Printf("Error updating image: %s. %s\n", job.ScanImage.sha, err)
+		log.Printf("Error updating annotations for image: %s. %s\n", job.ScanImage.sha, err)
 		return false
 	}
 
 	return true
+}
+
+func (job Job) MergeAnnotationResults(oldInfo bdscommon.ImageInfo, newInfo bdscommon.ImageInfo) bdscommon.ImageInfo {
+
+	for k, v := range newInfo.Labels {
+		oldInfo.Labels[k] = v
+	}
+
+	for k, v := range newInfo.Annotations {
+		oldInfo.Annotations[k] = v
+	}
+
+	return oldInfo
+
 }

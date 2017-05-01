@@ -148,6 +148,8 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 		if !c.annotation.IsScanNeeded(info, imageItem.sha, Hub.Config) {
 			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
+			imageItem.scanned = true
+			c.images[Reference] = imageItem
 			return
 		}
 
@@ -156,6 +158,58 @@ func (c *Controller) AddImage(ID string, Reference string) {
 		job.Load()
 		c.jobQueue <- job
 
+	}
+
+}
+
+func (c *Controller) ScanPodImage(Reference string) {
+
+	c.Lock()
+	defer c.Unlock()
+
+	imageItem, ok := c.images[Reference]
+	if !ok {
+		log.Printf("Requested scan from pod for unknown image %s\n", Reference)
+		return
+	}
+
+	if !imageItem.scanned {
+
+		job := Job{
+			ScanImage:  imageItem,
+			controller: c,
+		}
+
+		ok, info := job.GetAnnotationInfo()
+		if !ok {
+			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
+		}
+
+		if !c.annotation.IsScanNeeded(info, imageItem.sha, Hub.Config) {
+			log.Printf("Image sha %s previously scanned on a different node. Skipping.\n", imageItem.sha)
+			imageItem.scanned = true
+			c.images[Reference] = imageItem
+			return
+		}
+
+		log.Printf("Added %s from pod start to image map\n", imageItem.digest)
+
+		job.Load()
+		c.jobQueue <- job
+
+	}
+
+}
+
+func (c *Controller) RemoveImage(ID string, Reference string) {
+
+	c.Lock()
+	defer c.Unlock()
+
+	_, ok := c.images[Reference]
+	if ok {
+		delete(c.images, Reference)
+		log.Printf("Removed %s from map\n", Reference)
 	}
 
 }

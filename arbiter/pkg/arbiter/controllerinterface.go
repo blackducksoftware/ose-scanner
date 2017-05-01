@@ -24,6 +24,7 @@ package arbiter
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"encoding/hex"
@@ -252,12 +253,11 @@ func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool,
 	}
 
 	assignedImage, ok := arb.assignedImages[reqHash]
-	if ok {
+	if ok && strings.Compare (cd.info.Id, assignedImage.ControllerID) != 0 {
 		// need to check if previously assigned to another controller -- avoids dup scan as well as worker exhaustion
-		log.Printf("Requested image %s is currently assigned to %s\n", spec, assignedImage.ControllerID)
+		log.Printf("Requested image %s from %s is currently assigned to %s\n", spec, cd.info.Id, assignedImage.ControllerID)
 		return "", false, false
 	}
-
 
 	if !cd.AssignScan(spec) {
 		// we've probably run out of workers, but could be a data error. the latter ges cleaned up once scan is done on legit node

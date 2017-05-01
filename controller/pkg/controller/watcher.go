@@ -32,6 +32,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -57,6 +58,8 @@ func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
 }
 
 func (w *Watcher) Run() {
+
+	log.Println("Subscribing to image stream events ....")
 
 	_, k8sCtl := framework.NewInformer(
 		&cache.ListWatch{
@@ -84,6 +87,25 @@ func (w *Watcher) Run() {
 	log.Println("Watching image streams....")
 
 	go k8sCtl.Run(wait.NeverStop)
+
+	log.Println("Subscribing to pod events ....")
+
+	podWatchList := cache.NewListWatchFromClient(w.controller.kubeClient, "pods", kapi.NamespaceAll, fields.Everything())
+
+	_, k8sPodCtl := framework.NewInformer(
+		podWatchList,
+		&kapi.Pod{},
+		time.Minute,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				w.PodCreated(obj.(*kapi.Pod))
+			},
+		})
+
+	go k8sPodCtl.Run(wait.NeverStop)
+
+	log.Println("Watching image streams....")
+
 	select {}
 }
 
@@ -152,12 +174,21 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 
 	for _, events := range tags {
 		ref := events.Items[0].Image
-		_, err := w.openshiftClient.Images().Get(ref)
+		image, err := w.openshiftClient.Images().Get(ref)
 		if err != nil {
 			log.Printf("Error seeking deleted image %s@%s: %s\n", digest, ref, err)
 			continue
 		}
 
-		log.Printf("Image %s deleted with digest %s\n", ref, digest)
+		w.controller.RemoveImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+	}
+}
+
+func (w *Watcher) PodCreated(pod *kapi.Pod) {
+	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
+
+	for _, container := range pod.Spec.Containers {
+		log.Printf("\tPod container %s with image %s on pod %s\n", container.Name, container.Image, pod.ObjectMeta.Name)
+		w.controller.ScanPodImage(container.Image)
 	}
 }
