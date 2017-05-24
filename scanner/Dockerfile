@@ -1,7 +1,7 @@
-FROM projectatomic/atomicapp
+FROM centos:centos7
 MAINTAINER Black Duck Hub Team
 
-RUN yum -y update && yum clean all
+RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical --setopt=tsflags=nodocs && yum clean all
 
 ARG bds_ver
 
