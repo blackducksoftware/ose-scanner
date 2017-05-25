@@ -162,6 +162,20 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 }
 
+func (c *Controller) imageScanned (Reference string) bool {
+
+	c.Lock()
+	defer c.Unlock()
+
+	imageItem, ok := c.images[Reference]
+	if !ok {
+		log.Printf("Requested scan status for unknown image %s\n", Reference)
+		return true
+	}
+
+	return imageItem.scanned
+}
+
 func (c *Controller) ScanPodImage(Reference string) {
 
 	c.Lock()

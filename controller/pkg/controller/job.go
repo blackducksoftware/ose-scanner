@@ -43,6 +43,10 @@ func (job Job) Load() {
 	return
 }
 
+func (job Job) imageScanned (spec string) bool {
+	return job.controller.imageScanned (spec)
+}
+
 func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha)
 	if err != nil {

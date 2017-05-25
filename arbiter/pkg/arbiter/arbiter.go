@@ -60,6 +60,7 @@ type Arbiter struct {
 	requestedImages   map[string]string
 	assignedImages    map[string]*assignImage
 	annotation        *bdscommon.Annotator
+	lastScan          time.Time
 	sync.RWMutex
 }
 
@@ -131,11 +132,47 @@ func (arb *Arbiter) Load(done <-chan struct{}) {
 
 	arb.getImages(done)
 
+	log.Println("Done load of existing images. Waiting for initial processing to complete")
+
 	arb.queueImagesForNotification()
 
-	log.Println("Done load of existing images.")
+	arb.lastScan = time.Now()
+	duration := time.Since(arb.lastScan)
+
+	for duration.Seconds() < 15 {
+		time.Sleep(5 * time.Second)
+		duration = time.Since(arb.lastScan)
+	}
+
+	log.Println("Initial processing complete.")
 
 	return
+}
+
+func (arb *Arbiter) setStatus(result bool, Reference string) {
+	image, ok := arb.images[Reference]
+	if ok {
+		image.scanned = result
+		log.Printf("Set scan status for %s to %t\n", Reference, result)
+	} else {
+		log.Printf("Unknown image %s found with scan status of %t\n", Reference, result)
+	}
+
+	arb.lastScan = time.Now()
+}
+
+func (arb *Arbiter) Done(result bool, Reference string) {
+	arb.Lock()
+	defer arb.Unlock()
+
+	arb.setStatus(result, Reference)
+
+	arb.wait.Done()
+
+}
+
+func (arb *Arbiter) Add() {
+	arb.wait.Add(1)
 }
 
 func (arb *Arbiter) addImage(ID string, Reference string) {
@@ -154,7 +191,7 @@ func (arb *Arbiter) addImage(ID string, Reference string) {
 
 func (arb *Arbiter) queueImagesForNotification() {
 	for _, image := range arb.images {
-		log.Printf("Queuing %s for notificaiton check\n", image.digest)
+		log.Printf("Queuing %s for notification check\n", image.digest)
 		job := Job{
 			ScanImage: image,
 			arbiter:   arb,

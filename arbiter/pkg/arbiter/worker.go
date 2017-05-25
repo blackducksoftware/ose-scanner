@@ -51,6 +51,7 @@ func (w Worker) Start() {
 
 			select {
 			case job := <-w.jobQueue:
+				scanned := false
 				ok, info := job.GetAnnotationInfo()
 				if !ok {
 					log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
@@ -64,10 +65,11 @@ func (w Worker) Start() {
 				if ok && err == nil {
 					ok = job.UpdateAnnotationInfo(results)
 					if ok {
+						scanned = true
 						log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
 					}
 				}
-				job.Done()
+				job.Done(scanned)
 
 			case <-w.quit:
 				// we have received a signal to stop

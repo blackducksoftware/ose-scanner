@@ -78,6 +78,11 @@ func (w Worker) RequestScanAuthorization(job Job) {
 		return
 	}
 
+	if job.imageScanned(spec) {
+		log.Printf("Image %s previously queued and scanned. Skipping scan.\n", spec)
+		return
+	}
+
 	for {
 		connected := w.arbiter.heartbeat()
 		if connected {

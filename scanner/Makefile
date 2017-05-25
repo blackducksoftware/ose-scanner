@@ -1,4 +1,4 @@
-BDS_SCANNER := 3.5.1
+BDS_SCANNER ?= 3.6.2
 
 all:
 	#clean up from the past

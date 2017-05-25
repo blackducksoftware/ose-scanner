@@ -9,5 +9,6 @@ _test
 
 # Architecture specific extensions/prefixes
 output/*
+release/*
 
 

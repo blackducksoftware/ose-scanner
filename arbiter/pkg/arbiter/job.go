@@ -32,13 +32,13 @@ type Job struct {
 	arbiter   *Arbiter
 }
 
-func (job Job) Done() {
-	job.arbiter.wait.Done()
+func (job Job) Done(result bool) {
+	job.arbiter.Done(result, job.ScanImage.digest)
 	return
 }
 
 func (job Job) Load() {
-	job.arbiter.wait.Add(1)
+	job.arbiter.Add()
 	log.Println("Queue image: " + job.ScanImage.taggedName)
 	return
 }
@@ -52,13 +52,13 @@ func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 
 	info.Annotations = image.ObjectMeta.Annotations
 	if info.Annotations == nil {
-		log.Printf("Image %s has no annotations - creating object.\n", job.ScanImage.sha)
+		log.Printf("Image %s has no annotations - creating object.\n", job.ScanImage.digest)
 		info.Annotations = make(map[string]string)
 	}
 
 	info.Labels = image.ObjectMeta.Labels
 	if info.Labels == nil {
-		log.Printf("Image %s has no labels - creating object.\n", job.ScanImage.sha)
+		log.Printf("Image %s has no labels - creating object.\n", job.ScanImage.digest)
 		info.Labels = make(map[string]string)
 	}
 
@@ -82,7 +82,7 @@ func (job Job) UpdateAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
 
 	image, err = job.arbiter.openshiftClient.Images().Update(image)
 	if err != nil {
-		log.Printf("Error updating annotations for image: %s. %s\n", job.ScanImage.sha, err)
+		log.Printf("Error updating annotations for image: %s. %s\n", job.ScanImage.digest, err)
 		return false
 	}
 

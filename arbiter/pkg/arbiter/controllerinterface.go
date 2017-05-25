@@ -161,15 +161,17 @@ func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon) {
 	arb.Lock()
 	defer arb.Unlock()
 
+	arb.setStatus(true, image.ImageSpec)
+
 	cd.CompleteScan(image.ImageSpec)
 
-	for _, peers := range arb.controllerDaemons {
-		if cd.info.Id == peers.info.Id {
+	for _, peer := range arb.controllerDaemons {
+		if cd.info.Id == peer.info.Id {
 			// don't mess with the actual scanner or we could spin lock
 			continue
 		}
 
-		peers.SkipScan(image.ImageSpec)
+		peer.SkipScan(image.ImageSpec)
 	}
 
 	delete(arb.requestedImages, image.ImageSpec)
@@ -245,6 +247,18 @@ func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool,
 	arb.Lock()
 	defer arb.Unlock()
 
+	image, ok := arb.images[spec]
+	if !ok {
+		log.Printf("Missing spec. Controller %s is unable to scan %s at this time.\n", cd.info.Id, spec)
+		return "", false, false
+	}
+
+	if image.scanned {
+		// if multiple controllers grab an image, only one will process, and need to signal others to stand down once scan complete
+		log.Printf("Requested image %s has completed scan data. Skipping as duplicate request\n", spec)
+		return "", false, true
+	}
+
 	reqHash, ok := arb.requestedImages[spec]
 	if !ok {
 		// if multiple controllers grab an image, only one will process, and need to signal others to stand down once scan complete
@@ -253,7 +267,7 @@ func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool,
 	}
 
 	assignedImage, ok := arb.assignedImages[reqHash]
-	if ok && strings.Compare (cd.info.Id, assignedImage.ControllerID) != 0 {
+	if ok && strings.Compare(cd.info.Id, assignedImage.ControllerID) != 0 {
 		// need to check if previously assigned to another controller -- avoids dup scan as well as worker exhaustion
 		log.Printf("Requested image %s from %s is currently assigned to %s\n", spec, cd.info.Id, assignedImage.ControllerID)
 		return "", false, false
