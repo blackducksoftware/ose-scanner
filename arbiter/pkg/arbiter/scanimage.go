@@ -71,12 +71,12 @@ func (image ScanImage) versionResults(info bdscommon.ImageInfo) (error, bdscommo
 		return errors.New("Missing project information"), info
 	}
 
-	hub := bdscommon.HubServer{Config: Hub.Config}
+	hub := bdscommon.NewHubServer(Hub.Config)
+
 	if ok := hub.Login(); !ok {
 		log.Printf("Hub credentials not valid\n")
 		return errors.New("Invalid Hub credentials"), info
 	}
 
-	return bdscommon.ProjectVersionResults(info, image.imageId, image.taggedName, image.sha, scanId, projectVersionUrl, &hub, image.annotate)
-
+	return bdscommon.ProjectVersionResults(info, image.imageId, image.taggedName, image.sha, scanId, projectVersionUrl, hub, image.annotate)
 }

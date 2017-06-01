@@ -46,8 +46,6 @@ type HubParams struct {
 	Version string
 }
 
-var Hub HubParams
-
 type Controller struct {
 	openshiftClient *osclient.Client
 	kubeClient      *kclient.Client
@@ -59,16 +57,15 @@ type Controller struct {
 	images          map[string]*ScanImage
 	annotation      *bdscommon.Annotator
 	sync.RWMutex
+	hubParams *HubParams
 }
 
-func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Controller {
+func NewController(os *osclient.Client, kc *kclient.Client, hub *HubParams) *Controller {
 
 	f := clientcmd.New(pflag.NewFlagSet("empty", pflag.ContinueOnError))
 	mapper, typer := f.Object(false)
 
-	Hub = hub
-
-	jobQueue := make(chan Job, Hub.Workers)
+	jobQueue := make(chan Job, hub.Workers)
 
 	return &Controller{
 		openshiftClient: os,
@@ -79,13 +76,14 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub HubParams) *Cont
 		jobQueue:        jobQueue,
 		images:          make(map[string]*ScanImage),
 		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
+		hubParams: hub,
 	}
 }
 
 func (c *Controller) Start(arb *Arbiter) {
 
 	log.Println("Starting controller ....")
-	dispatcher := NewDispatcher(c.jobQueue, Hub.Workers)
+	dispatcher := NewDispatcher(c.jobQueue, c.hubParams.Workers)
 	arb.heartbeat()
 	dispatcher.Run(arb)
 
@@ -132,7 +130,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 	_, ok := c.images[Reference]
 	if !ok {
 
-		imageItem := newScanImage(ID, Reference, c.annotation)
+		imageItem := newScanImage(ID, Reference, c.annotation, c.hubParams.Config, c.hubParams.Scanner)
 
 		c.images[Reference] = imageItem
 
@@ -146,7 +144,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
 		}
 
-		if !c.annotation.IsScanNeeded(info, imageItem.sha, Hub.Config) {
+		if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
 			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
 			imageItem.scanned = true
 			c.images[Reference] = imageItem
@@ -199,7 +197,7 @@ func (c *Controller) ScanPodImage(Reference string) {
 			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
 		}
 
-		if !c.annotation.IsScanNeeded(info, imageItem.sha, Hub.Config) {
+		if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
 			log.Printf("Image sha %s previously scanned on a different node. Skipping.\n", imageItem.sha)
 			imageItem.scanned = true
 			c.images[Reference] = imageItem
@@ -251,11 +249,8 @@ func (c *Controller) getImages(done <-chan struct{}) {
 }
 
 func (c *Controller) ValidateConfig() bool {
-
-	hubServer := bdscommon.HubServer{Config: Hub.Config}
-
+	hubServer := bdscommon.NewHubServer(c.hubParams.Config)
 	return hubServer.Login()
-
 }
 
 func (c *Controller) ValidateDockerConfig() bool {

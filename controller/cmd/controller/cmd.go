@@ -74,7 +74,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	c := controller.NewController(openshiftClient, kubeClient, hub)
+	c := controller.NewController(openshiftClient, kubeClient, &hub)
 
 	if !c.ValidateDockerConfig() {
 		log.Printf("Docker configuation information isn't valid. Please verify connectivity and permissions.")

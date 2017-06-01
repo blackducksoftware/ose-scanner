@@ -38,9 +38,11 @@ type ScanImage struct {
 	scanned    bool
 	scanId     string
 	annotate   *bdscommon.Annotator
+	config *bdscommon.HubConfig
+	scanner string
 }
 
-func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator) *ScanImage {
+func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator, config *bdscommon.HubConfig, scanner string) *ScanImage {
 
 	tag := strings.Split(Reference, "@")
 
@@ -51,6 +53,8 @@ func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator) *S
 		digest:     Reference,
 		scanned:    false,
 		annotate:   annotate,
+		config: config,
+		scanner: scanner,
 	}
 }
 
@@ -61,19 +65,19 @@ func (image ScanImage) getArgs() []string {
 	args = append(args, "/ose_scanner")
 
 	args = append(args, "-h")
-	args = append(args, Hub.Config.Host)
+	args = append(args, image.config.Host)
 
 	args = append(args, "-p")
-	args = append(args, Hub.Config.Port)
+	args = append(args, image.config.Port)
 
 	args = append(args, "-s")
-	args = append(args, Hub.Config.Scheme)
+	args = append(args, image.config.Scheme)
 
 	args = append(args, "-u")
-	args = append(args, Hub.Config.User)
+	args = append(args, image.config.User)
 
 	args = append(args, "-w")
-	args = append(args, Hub.Config.Password)
+	args = append(args, image.config.Password)
 
 	args = append(args, "-id")
 	args = append(args, image.imageId)
@@ -105,7 +109,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 
 	args := image.getArgs()
 
-	goodScan, err := docker.launchContainer(Hub.Scanner, args)
+	goodScan, err := docker.launchContainer(image.scanner, args)
 
 	if err != nil {
 		log.Printf("Error creating scanning container: %s\n", err)
@@ -125,7 +129,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 }
 
 func (image ScanImage) results(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
-	return bdscommon.ScanResults(info, image.taggedName, image.imageId, image.scanId, image.sha, image.annotate, Hub.Config)
+	return bdscommon.ScanResults(info, image.taggedName, image.imageId, image.scanId, image.sha, image.annotate, image.config)
 }
 
 func (image ScanImage) exists() bool {
