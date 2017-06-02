@@ -32,232 +32,41 @@ import (
 	"time"
 )
 
+const hangtimeBeforeTimingOutOnTheHub = 10*time.Second
+
 type myjar struct {
-	jar map[string][]*http.Cookie
+	// why is a jar a map of string->cookie1,cookie2,...?
+	jar map[string] []*http.Cookie
 }
 
+// unused ?
 func (p *myjar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	p.jar[u.Host] = cookies
 }
 
+// Is this supposed to be a "GetCookies" method?
 func (p *myjar) Cookies(u *url.URL) []*http.Cookie {
 	return p.jar[u.Host]
 }
 
-type HubConfig struct {
-	Url      string `json:"url"`
-	Host     string `json:"hubhost"`
-	Port     string `json:"port"`
-	Scheme   string `json:"scheme"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+func NewHubServer(config *HubConfig) *hubServer{
+	return &hubServer{
+		&http.Client{
+			Timeout: hangtimeBeforeTimingOutOnTheHub,
+		},
+		config,
+	}
 }
 
-type CodeLocationStruct struct {
-	Type                 string    `json:"type"`
-	Name                 string    `json:"name"`
-	URL                  string    `json:"url"`
-	CreatedAt            time.Time `json:"createdAt"`
-	UpdatedAt            time.Time `json:"updatedAt"`
-	MappedProjectVersion string    `json:"mappedProjectVersion"`
-	Meta                 struct {
-		Allow []string `json:"allow"`
-		Href  string   `json:"href"`
-		Links []struct {
-			Rel  string `json:"rel"`
-			Href string `json:"href"`
-		} `json:"links"`
-	} `json:"_meta"`
-}
-
-type CodeLocationsStruct struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		Type                 string    `json:"type"`
-		URL                  string    `json:"url"`
-		CreatedAt            time.Time `json:"createdAt"`
-		UpdatedAt            time.Time `json:"updatedAt"`
-		MappedProjectVersion string    `json:"mappedProjectVersion"`
-		Meta                 struct {
-			Allow []string `json:"allow"`
-			Href  string   `json:"href"`
-			Links []struct {
-				Rel  string `json:"rel"`
-				Href string `json:"href"`
-			} `json:"links"`
-		} `json:"_meta"`
-	} `json:"items"`
-	Meta struct {
-		Allow []string      `json:"allow"`
-		Href  string        `json:"href"`
-		Links []interface{} `json:"links"`
-	} `json:"_meta"`
-	AppliedFilters []interface{} `json:"appliedFilters"`
-}
-
-type ScanSummaryStruct struct {
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
-	Meta      struct {
-		Allow []string `json:"allow"`
-		Href  string   `json:"href"`
-		Links []struct {
-			Rel  string `json:"rel"`
-			Href string `json:"href"`
-		} `json:"links"`
-	} `json:"_meta"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type codeLocationsScanSummariesStruct struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		Status    string    `json:"status"`
-		CreatedAt time.Time `json:"createdAt"`
-		Meta      struct {
-			Allow []string `json:"allow"`
-			Href  string   `json:"href"`
-			Links []struct {
-				Rel  string `json:"rel"`
-				Href string `json:"href"`
-			} `json:"links"`
-		} `json:"_meta"`
-		UpdatedAt time.Time `json:"updatedAt"`
-	} `json:"items"`
-	Meta struct {
-		Allow []string      `json:"allow"`
-		Href  string        `json:"href"`
-		Links []interface{} `json:"links"`
-	} `json:"_meta"`
-	AppliedFilters []interface{} `json:"appliedFilters"`
-}
-
-type projectsStruct struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		Name                    string `json:"name"`
-		ProjectLevelAdjustments bool   `json:"projectLevelAdjustments"`
-		Source                  string `json:"source"`
-		Meta                    struct {
-			Allow []string `json:"allow"`
-			Href  string   `json:"href"`
-			Links []struct {
-				Rel  string `json:"rel"`
-				Href string `json:"href"`
-			} `json:"links"`
-		} `json:"_meta"`
-	} `json:"items"`
-}
-
-type projectVersionStruct struct {
-	VersionName  string `json:"versionName"`
-	Phase        string `json:"phase"`
-	Distribution string `json:"distribution"`
-	Source       string `json:"source"`
-	Meta         struct {
-		Allow []string `json:"allow"`
-		Href  string   `json:"href"`
-		Links []struct {
-			Rel  string `json:"rel"`
-			Href string `json:"href"`
-		} `json:"links"`
-	} `json:"_meta"`
-}
-
-type projectVersionsStruct struct {
-	TotalCount int `json:"totalCount"`
-	Items      []struct {
-		VersionName  string `json:"versionName"`
-		Phase        string `json:"phase"`
-		Distribution string `json:"distribution"`
-		Source       string `json:"source"`
-		Meta         struct {
-			Allow []string `json:"allow"`
-			Href  string   `json:"href"`
-			Links []struct {
-				Rel  string `json:"rel"`
-				Href string `json:"href"`
-			} `json:"links"`
-		} `json:"_meta"`
-	} `json:"items"`
-}
-
-type riskProfileStruct struct {
-	Categories struct {
-		VERSION struct {
-			HIGH    int `json:"HIGH"`
-			MEDIUM  int `json:"MEDIUM"`
-			LOW     int `json:"LOW"`
-			OK      int `json:"OK"`
-			UNKNOWN int `json:"UNKNOWN"`
-		} `json:"VERSION"`
-		VULNERABILITY struct {
-			HIGH    int `json:"HIGH"`
-			MEDIUM  int `json:"MEDIUM"`
-			LOW     int `json:"LOW"`
-			OK      int `json:"OK"`
-			UNKNOWN int `json:"UNKNOWN"`
-		} `json:"VULNERABILITY"`
-		ACTIVITY struct {
-			HIGH    int `json:"HIGH"`
-			MEDIUM  int `json:"MEDIUM"`
-			LOW     int `json:"LOW"`
-			OK      int `json:"OK"`
-			UNKNOWN int `json:"UNKNOWN"`
-		} `json:"ACTIVITY"`
-		LICENSE struct {
-			HIGH    int `json:"HIGH"`
-			MEDIUM  int `json:"MEDIUM"`
-			LOW     int `json:"LOW"`
-			OK      int `json:"OK"`
-			UNKNOWN int `json:"UNKNOWN"`
-		} `json:"LICENSE"`
-		OPERATIONAL struct {
-			HIGH    int `json:"HIGH"`
-			MEDIUM  int `json:"MEDIUM"`
-			LOW     int `json:"LOW"`
-			OK      int `json:"OK"`
-			UNKNOWN int `json:"UNKNOWN"`
-		} `json:"OPERATIONAL"`
-	} `json:"categories"`
-	Meta struct {
-		Allow []string `json:"allow"`
-		Href  string   `json:"href"`
-		Links []struct {
-			Rel  string `json:"rel"`
-			Href string `json:"href"`
-		} `json:"links"`
-	} `json:"_meta"`
-}
-
-type policyStatusStruct struct {
-	OverallStatus                string    `json:"overallStatus"`
-	UpdatedAt                    time.Time `json:"updatedAt"`
-	ComponentVersionStatusCounts []struct {
-		Name  string `json:"name"`
-		Value int    `json:"value"`
-	} `json:"componentVersionStatusCounts"`
-	Meta struct {
-		Allow []string      `json:"allow"`
-		Href  string        `json:"href"`
-		Links []interface{} `json:"links"`
-	} `json:"_meta"`
-}
-
-type HubServer struct {
-	client *http.Client
-	Config *HubConfig
-}
-
-func (h *HubServer) Login() bool {
+func (h *hubServer) Login() bool {
 	// check if the Config entry is initialized
-	if h.Config == nil {
-		log.Printf("ERROR in HubServer no configuration available.\n")
+	if h.config == nil {
+		log.Printf("ERROR in hubServer no configuration available.\n")
 		return false
 	}
 
-	log.Printf("Login attempt for %s\n", h.Config.Url)
-	u, err := url.ParseRequestURI(h.Config.Url)
+	log.Printf("Login attempt for %s\n", h.config.Url)
+	u, err := url.ParseRequestURI(h.config.Url)
 	if err != nil {
 		log.Printf("ERROR : url.ParseRequestURI: %s\n", err)
 		return false
@@ -266,10 +75,8 @@ func (h *HubServer) Login() bool {
 	resource := "/j_spring_security_check"
 	u.Path = resource
 	data := url.Values{}
-	data.Add("j_username", h.Config.User)
-	data.Add("j_password", h.Config.Password)
-
-	h.client = &http.Client{}
+	data.Add("j_username", h.config.User)
+	data.Add("j_password", h.config.Password)
 
 	jar := &myjar{}
 	jar.jar = make(map[string][]*http.Cookie)
@@ -297,7 +104,7 @@ func (h *HubServer) Login() bool {
 	return true
 }
 
-func (h *HubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
+func (h *hubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 
 	log.Println(apiUrl)
 
@@ -316,9 +123,9 @@ func (h *HubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 	return &codeLocation, true
 }
 
-func (h *HubServer) FindCodeLocations(searchCriterea string) *CodeLocationsStruct {
+func (h *hubServer) FindCodeLocations(searchCriterea string) *CodeLocationsStruct {
 	searchStr := url.QueryEscape(searchCriterea)
-	getStr := fmt.Sprintf("%s/api/codelocations/?q=%s&limit=5000", h.Config.Url, searchStr)
+	getStr := fmt.Sprintf("%s/api/codelocations/?q=%s&limit=5000", h.config.Url, searchStr)
 	log.Println(getStr)
 
 	var codeLocations CodeLocationsStruct
@@ -334,7 +141,7 @@ func (h *HubServer) FindCodeLocations(searchCriterea string) *CodeLocationsStruc
 	return &codeLocations
 }
 
-func (h *HubServer) FindCodeLocationScanSummaries(url string) *codeLocationsScanSummariesStruct {
+func (h *hubServer) FindCodeLocationScanSummaries(url string) *codeLocationsScanSummariesStruct {
 
 	log.Println(url)
 
@@ -351,8 +158,8 @@ func (h *HubServer) FindCodeLocationScanSummaries(url string) *codeLocationsScan
 	return &codeLocationsScanSummaries
 }
 
-func (h *HubServer) GetScanSummary(scanId string) (*ScanSummaryStruct, bool) {
-	apiUrl := fmt.Sprintf("%s/api/scan-summaries/%s", h.Config.Url, scanId)
+func (h *hubServer) GetScanSummary(scanId string) (*ScanSummaryStruct, bool) {
+	apiUrl := fmt.Sprintf("%s/api/scan-summaries/%s", h.config.Url, scanId)
 
 	log.Println(apiUrl)
 
@@ -372,10 +179,10 @@ func (h *HubServer) GetScanSummary(scanId string) (*ScanSummaryStruct, bool) {
 	return &scanSummary, true
 }
 
-func (h *HubServer) FindProjects(projectName string) *projectsStruct {
+func (h *hubServer) FindProjects(projectName string) *projectsStruct {
 	searchCriterea := "name:" + projectName
 	searchStr := url.QueryEscape(searchCriterea)
-	getStr := fmt.Sprintf("%s/api/projects/?q=%s&limit=5000", h.Config.Url, searchStr)
+	getStr := fmt.Sprintf("%s/api/projects/?q=%s&limit=5000", h.config.Url, searchStr)
 	log.Println(getStr)
 
 	var projects projectsStruct
@@ -391,7 +198,7 @@ func (h *HubServer) FindProjects(projectName string) *projectsStruct {
 	return &projects
 }
 
-func (h *HubServer) GetProjectVersion(apiUrl string) (*projectVersionStruct, bool) {
+func (h *hubServer) GetProjectVersion(apiUrl string) (*projectVersionStruct, bool) {
 
 	log.Println(apiUrl)
 
@@ -410,10 +217,10 @@ func (h *HubServer) GetProjectVersion(apiUrl string) (*projectVersionStruct, boo
 	return &projectVersion, true
 }
 
-func (h *HubServer) FindProjectVersions(projectId string, projectVersion string) *projectVersionsStruct {
+func (h *hubServer) FindProjectVersions(projectId string, projectVersion string) *projectVersionsStruct {
 	searchCriterea := "versionName:" + projectVersion
 	searchStr := url.QueryEscape(searchCriterea)
-	getStr := fmt.Sprintf("%s/api/projects/%s/versions?q=%s&limit=5000", h.Config.Url, projectId, searchStr)
+	getStr := fmt.Sprintf("%s/api/projects/%s/versions?q=%s&limit=5000", h.config.Url, projectId, searchStr)
 	log.Println(getStr)
 
 	var projectVersions projectVersionsStruct
@@ -429,7 +236,7 @@ func (h *HubServer) FindProjectVersions(projectId string, projectVersion string)
 	return &projectVersions
 }
 
-func (h *HubServer) GetRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
+func (h *hubServer) GetRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
 
 	log.Println(apiUrl)
 
@@ -448,7 +255,7 @@ func (h *HubServer) GetRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
 	return &riskProfile, true
 }
 
-func (h *HubServer) GetPolicyStatus(apiUrl string) (*policyStatusStruct, bool) {
+func (h *hubServer) GetPolicyStatus(apiUrl string) (*policyStatusStruct, bool) {
 
 	log.Println(apiUrl)
 
@@ -467,7 +274,7 @@ func (h *HubServer) GetPolicyStatus(apiUrl string) (*policyStatusStruct, bool) {
 	return &policyStatus, true
 }
 
-func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer {
+func (h *hubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer {
 
 	buf := new(bytes.Buffer)
 	resp, err := h.client.Get(restEndPointUrl)
@@ -489,5 +296,4 @@ func (h *HubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer
 	defer resp.Body.Close()
 
 	return buf
-
 }

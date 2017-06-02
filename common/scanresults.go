@@ -33,7 +33,7 @@ import (
 func ScanResults(info ImageInfo, taggedName string, imageId string, scanId string, sha string, annotate *Annotator, hubConfig *HubConfig) (e error, results ImageInfo) {
 	log.Printf("Checking for vulnerabilities on: %s\n", taggedName)
 
-	hub := HubServer{Config: hubConfig}
+	hub := NewHubServer(hubConfig)
 	if ok := hub.Login(); !ok {
 		log.Printf("Hub credentials not valid\n")
 		return errors.New("Invalid Hub credentials"), info
@@ -138,7 +138,7 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 
 func ValidateGetProjectVersion(projectVersionUrl string, hubConfig *HubConfig) bool {
 
-	hub := HubServer{Config: hubConfig}
+	hub := NewHubServer(hubConfig)
 	if ok := hub.Login(); !ok {
 		log.Printf("Hub credentials not valid during project version check\n")
 		return false
@@ -152,7 +152,7 @@ func ValidateGetProjectVersion(projectVersionUrl string, hubConfig *HubConfig) b
 	return ok
 }
 
-func ProjectVersionResults(info ImageInfo, imageId string, taggedName string, sha string, scanId string, projectVersionUrl string, hub *HubServer, annotate *Annotator) (e error, results ImageInfo) {
+func ProjectVersionResults(info ImageInfo, imageId string, taggedName string, sha string, scanId string, projectVersionUrl string, hub *hubServer, annotate *Annotator) (e error, results ImageInfo) {
 	log.Printf("Processing vulnerabilities and policy violations for %s:%s\n", taggedName, imageId[:10])
 
 	projectVersion, ok := hub.GetProjectVersion(projectVersionUrl)
