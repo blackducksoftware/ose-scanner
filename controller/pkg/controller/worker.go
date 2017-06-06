@@ -131,11 +131,9 @@ func (w Worker) RequestScanAuthorization(job Job) {
 			break
 		}
 
-		if ok && err == nil {
-			ok = job.UpdateAnnotationInfo(results)
-			if ok {
-				log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
-			}
+		ok = job.UpdateAnnotationInfo(results)
+		if ok {
+			log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
 		}
 
 		w.arbiter.scanDone(requestHash)

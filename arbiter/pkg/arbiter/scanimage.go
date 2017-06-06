@@ -42,9 +42,10 @@ type ScanImage struct {
 func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator) *ScanImage {
 
 	tag := strings.Split(Reference, "@")
+	Ids := strings.Split(ID, "sha256:")
 
 	return &ScanImage{
-		imageId:    ID,
+		imageId:    Ids[len(Ids)-1],
 		taggedName: tag[0],
 		sha:        tag[1],
 		digest:     Reference,

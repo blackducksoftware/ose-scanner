@@ -38,23 +38,25 @@ type ScanImage struct {
 	scanned    bool
 	scanId     string
 	annotate   *bdscommon.Annotator
-	config *bdscommon.HubConfig
-	scanner string
+	config     *bdscommon.HubConfig
+	scanner    string
 }
 
 func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator, config *bdscommon.HubConfig, scanner string) *ScanImage {
 
 	tag := strings.Split(Reference, "@")
 
+	Ids := strings.Split(ID, "sha256:")
+
 	return &ScanImage{
-		imageId:    ID,
+		imageId:    Ids[len(Ids)-1],
 		taggedName: tag[0],
 		sha:        tag[1],
 		digest:     Reference,
 		scanned:    false,
 		annotate:   annotate,
-		config: config,
-		scanner: scanner,
+		config:     config,
+		scanner:    scanner,
 	}
 }
 
@@ -134,7 +136,7 @@ func (image ScanImage) results(info bdscommon.ImageInfo) (error, bdscommon.Image
 
 func (image ScanImage) exists() bool {
 
-	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+	log.Printf("Testing for image: %s (%s)\n", image.taggedName, image.imageId[:10])
 
 	docker := NewDocker()
 	if docker.client == nil {

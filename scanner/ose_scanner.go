@@ -76,10 +76,12 @@ var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
 var dumpFlag *bool = flag.Bool("d", false, "dumps extracted tar in /tmp.")
 
 func scanImage(path string, imageId string, taggedImage string) {
+	log.Println("Scanning " + taggedImage)
 
-	prefix := imageId[:10]
 	img_arr := strings.Split(taggedImage, "@sha256:")
 	img_name := img_arr[0]
+	img_ps := img_arr[1]
+	prefix := img_ps[:10]
 	project := img_name
 
 	appHomeDir := os.Getenv(APP_HOME_VAR_NAME)
@@ -392,14 +394,14 @@ func main() {
 	log.Println(path)
 
 	if strings.Contains(path, "<none>") {
-		log.Printf("WARNING : image : %s won't be scanned.", image)
+		log.Printf("WARNING: Image : %s won't be scanned.", digest)
 	} else {
 		newTarPath, err := saveImageToTar(client, digest, path)
 
 		if err != nil {
 			log.Printf("Error while making tar file: %s\n", err)
 		} else {
-			scanImage(newTarPath, image, in.taggedImage)
+			scanImage(newTarPath, image, digest)
 		}
 
 		if !*dumpFlag {

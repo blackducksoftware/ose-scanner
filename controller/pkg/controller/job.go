@@ -43,8 +43,8 @@ func (job Job) Load() {
 	return
 }
 
-func (job Job) imageScanned (spec string) bool {
-	return job.controller.imageScanned (spec)
+func (job Job) imageScanned(spec string) bool {
+	return job.controller.imageScanned(spec)
 }
 
 func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {

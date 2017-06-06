@@ -76,7 +76,7 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub *HubParams) *Con
 		jobQueue:        jobQueue,
 		images:          make(map[string]*ScanImage),
 		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
-		hubParams: hub,
+		hubParams:       hub,
 	}
 }
 
@@ -145,7 +145,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 		}
 
 		if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
-			log.Printf("Image sha %s previously scanned. Skipping.\n", imageItem.sha)
+			log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
 			imageItem.scanned = true
 			c.images[Reference] = imageItem
 			return
@@ -160,7 +160,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 }
 
-func (c *Controller) imageScanned (Reference string) bool {
+func (c *Controller) imageScanned(Reference string) bool {
 
 	c.Lock()
 	defer c.Unlock()
