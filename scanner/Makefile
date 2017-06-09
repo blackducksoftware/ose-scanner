@@ -12,6 +12,7 @@ all:
 
 	rm -Rf ./hub_scanner/scan.cli
 	unzip ./hub_scanner/scan.cli-$(BDS_SCANNER).zip -d ./hub_scanner/scan.cli
+	\cp ../LICENSE ./
 	
 	docker build --rm --build-arg bds_ver=$(BDS_SCANNER) -t hub_ose_scanner:$(BDS_SCANNER) -f Dockerfile .
 	docker save hub_ose_scanner:$(BDS_SCANNER) > ./output/hub_ose_scanner.tar

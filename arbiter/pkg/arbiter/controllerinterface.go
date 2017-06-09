@@ -104,7 +104,7 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	arb.releaseScanForPeer(image, cd)
+	arb.releaseScanForPeer(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
 
@@ -112,12 +112,13 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon) {
+func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon, imageHash string) {
 
 	arb.Lock()
 	defer arb.Unlock()
 
 	cd.AbortScan(image.ImageSpec)
+	delete(arb.assignedImages, imageHash)
 }
 
 func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
@@ -146,9 +147,7 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	arb.finalizeScan(image, cd)
-
-	delete(arb.assignedImages, imageHash)
+	arb.finalizeScan(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
 
@@ -156,7 +155,7 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon) {
+func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon, imageHash string) {
 
 	arb.Lock()
 	defer arb.Unlock()
@@ -175,6 +174,7 @@ func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon) {
 	}
 
 	delete(arb.requestedImages, image.ImageSpec)
+	delete(arb.assignedImages, imageHash)
 }
 
 func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {

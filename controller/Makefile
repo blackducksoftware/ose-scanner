@@ -6,7 +6,8 @@ all:
 	rm -Rf ./output \
 	mkdir output
 
-	cp /etc/ssl/certs/ca-bundle.crt ca-certificates.crt
+	\cp /etc/ssl/certs/ca-bundle.crt ca-certificates.crt
+	\cp ../LICENSE ./
 
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-X main.bds_version=$(BDS_SCANNER)" -o ./output/controller ./cmd/controller
 	

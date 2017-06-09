@@ -6,6 +6,7 @@ ARG bds_ver
 
 COPY ./output/ose_arbiter /ose_arbiter
 COPY ./ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY ./LICENSE /LICENSE
 
 LABEL vendor="Black Duck Software" \
       com.blackducksoftware.version="${bds_ver}" \

@@ -63,6 +63,12 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 			log.Printf("%s\n", e)
 			return errors.New(e), info
 		}
+
+		if strings.Compare(scanSummary.Status, "ERROR_BUILDING_BOM") == 0 {
+			e := fmt.Sprintf("ERROR building BOM for image: %s", imageId)
+			log.Printf("%s\n", e)
+			return errors.New(e), info
+		}
 	}
 
 	codeLocationUrl := ""
