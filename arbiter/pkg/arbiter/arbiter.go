@@ -62,6 +62,7 @@ type Arbiter struct {
 	annotation        *bdscommon.Annotator
 	lastScan          time.Time
 	sync.RWMutex
+	hubActivities uint64
 }
 
 func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter {
@@ -85,6 +86,7 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 		assignedImages:    make(map[string]*assignImage),
 		controllerDaemons: make(map[string]*controllerDaemon),
 		annotation:        bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
+		hubActivities:     0,
 	}
 }
 

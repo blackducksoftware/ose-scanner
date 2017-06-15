@@ -25,6 +25,7 @@ package arbiter
 import (
 	"log"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"encoding/hex"
@@ -59,6 +60,23 @@ type assignImage struct {
 type jsonErr struct {
 	Code int    `json:"code"`
 	Text string `json:"text"`
+}
+
+func (arb *Arbiter) QueueHubActivity() uint64 {
+	return atomic.AddUint64(&arb.hubActivities, 1)
+}
+
+func (arb *Arbiter) DeQueueHubActivity() {
+	atomic.AddUint64(&arb.hubActivities, ^uint64(0))
+}
+
+func (arb *Arbiter) HubActivityQueue() uint64 {
+	return atomic.LoadUint64(&arb.hubActivities)
+}
+
+func (arb *Arbiter) CanSendHubJobs() bool {
+	// this is hardcoded for the moment, but should be a function of Hub job runners
+	return arb.HubActivityQueue() > 7
 }
 
 func (arb *Arbiter) ListenForControllers() {
@@ -107,8 +125,9 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 	arb.releaseScanForPeer(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
+	arb.DeQueueHubActivity()
 
-	log.Println("Done scanAbort")
+	log.Printf("Done abortScan - Hub jobs: %d", arb.HubActivityQueue())
 
 }
 
@@ -150,8 +169,9 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 	arb.finalizeScan(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
+	arb.DeQueueHubActivity()
 
-	log.Println("Done scanDone")
+	log.Printf("Done scanDone - Hub jobs: %d", arb.HubActivityQueue())
 
 }
 
@@ -213,6 +233,22 @@ func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {
 func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request assignScan")
 	var i imageInfo
+	var resp imageResult
+
+	if !arb.CanSendHubJobs() {
+		resp.RequestId = "" 
+		resp.StartScan = false 
+		resp.SkipScan = false
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			log.Printf("Error encoding busy image response: %s\n", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+
+		log.Println("Done assignScan - Hub currently busy with other jobs. Requeue.")
+	}
 
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
@@ -231,16 +267,17 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resp imageResult
 	resp.RequestId, resp.StartScan, resp.SkipScan = arb.findWorker(i.ImageSpec, cd)
-	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding image response: %s\n", err)
 		w.WriteHeader(500)
 		return
 	}
-	log.Println("Done assignScan")
+
+	w.WriteHeader(http.StatusOK)
+	arb.QueueHubActivity()
+	log.Printf("Done assignScan - Hub jobs: %d", arb.HubActivityQueue())
 }
 
 func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool, bool) {
