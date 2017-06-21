@@ -111,7 +111,6 @@ func init() {
 	pflag.StringVar(&hub.Config.Scheme, "s", "REQUIRED", "The communication scheme [http,https].")
 	pflag.StringVar(&hub.Config.User, "u", "REQUIRED", "The Black Duck Hub user")
 	pflag.StringVar(&hub.Config.Password, "w", "REQUIRED", "Password for the user.")
-
 }
 
 func checkExpectedCmdlineParams() bool {
@@ -172,6 +171,5 @@ func checkExpectedCmdlineParams() bool {
 	} else {
 		hub.Config.Url = fmt.Sprintf("%s://%s:%s", hub.Config.Scheme, hub.Config.Host, hub.Config.Port)
 	}
-
 	return true
 }
