@@ -40,7 +40,7 @@ import (
 
 const (
 	APP_VERSION                   = "0.1"
-	DEFAULT_BDS_SCANNER_BASE_DIR  = "/tmp/bds-scanner"
+	DEFAULT_BDS_SCANNER_BASE_DIR  = "/tmp/ocp-scanner"
 	CLI_IMPL_JAR_FILE_NAME        = "scan.cli.impl-standalone.jar"
 	BDS_SCANNER_BASE_DIR_VAR_NAME = "SCANNER_BASE_DIR"
 	SCAN_CLI_JAR_NAME_VAR_NAME    = "SCAN_CLI_JAR_NAME"
@@ -217,12 +217,6 @@ func imageExists(client *httputil.ClientConn, image string) (result bool, err er
 func getScannerOutputDir() string {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
-	// Get hostname to use as part of the output path
-	hostname, err := os.Hostname()
-	if err != nil {
-		fmt.Printf("ERROR: getting hostname %s\n", err)
-		hostname = "default-host"
-	}
 
 	// Check to see if we can get the env var for the base dir (we should always be able to)
 	bdsScannerBaseDir := os.Getenv(BDS_SCANNER_BASE_DIR_VAR_NAME)
@@ -233,7 +227,7 @@ func getScannerOutputDir() string {
 	}
 
 	// Make base out dir for any scanner output, scans, etc...
-	scannerOutputDir := filepath.Join(bdsScannerBaseDir, hostname)
+	scannerOutputDir := bdsScannerBaseDir
 	os.MkdirAll(scannerOutputDir, os.ModeDir|os.ModePerm)
 
 	fmt.Printf("Scanner Output Dir: %s\n", scannerOutputDir)

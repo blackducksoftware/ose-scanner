@@ -25,6 +25,7 @@ package arbiter
 import (
 	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 	"log"
+	"time"
 )
 
 type Job struct {
@@ -34,6 +35,7 @@ type Job struct {
 
 func (job Job) Done(result bool) {
 	job.arbiter.Done(result, job.ScanImage.digest)
+	time.Sleep(100 * time.Millisecond) // allow API server some time to breathe
 	return
 }
 

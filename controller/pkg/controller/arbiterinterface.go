@@ -121,15 +121,21 @@ func (a *Arbiter) alertImage(spec string) (requestHash string, skipScan bool) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests:
+		log.Printf("Image %s previously requested and in queue\n", spec)
+		return "", true
+
+	case http.StatusCreated:
+		var result imageResult
+		_ = json.NewDecoder(resp.Body).Decode(&result)
+
+		return result.RequestId, false
+
+	default:
 		log.Printf("New image http status error %d\n", resp.StatusCode)
 		return "", true
 	}
-
-	var result imageResult
-	_ = json.NewDecoder(resp.Body).Decode(&result)
-
-	return result.RequestId, false
 
 }
 

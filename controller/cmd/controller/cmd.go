@@ -42,6 +42,7 @@ import (
 )
 
 var bds_version string
+var build_num string
 var hub controller.HubParams
 
 func main() {
@@ -108,7 +109,7 @@ func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
-	log.Printf("Initializing Black Duck scan controller version %s\n", bds_version)
+	log.Printf("Initializing Black Duck scan controller version %s build %s\n", bds_version, build_num)
 
 	hub.Config = &bdscommon.HubConfig{}
 

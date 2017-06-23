@@ -127,7 +127,8 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 		return image.results(info)
 	}
 
-	return nil, info
+	return image.results(info)
+
 }
 
 func (image ScanImage) results(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {

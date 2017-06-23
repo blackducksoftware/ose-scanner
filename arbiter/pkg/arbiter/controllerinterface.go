@@ -25,7 +25,7 @@ package arbiter
 import (
 	"log"
 	"strings"
-	"sync/atomic"
+
 	"time"
 
 	"encoding/hex"
@@ -62,21 +62,9 @@ type jsonErr struct {
 	Text string `json:"text"`
 }
 
-func (arb *Arbiter) QueueHubActivity() uint64 {
-	return atomic.AddUint64(&arb.hubActivities, 1)
-}
-
-func (arb *Arbiter) DeQueueHubActivity() {
-	atomic.AddUint64(&arb.hubActivities, ^uint64(0))
-}
-
-func (arb *Arbiter) HubActivityQueue() uint64 {
-	return atomic.LoadUint64(&arb.hubActivities)
-}
-
 func (arb *Arbiter) CanSendHubJobs() bool {
 	// this is hardcoded for the moment, but should be a function of Hub job runners
-	return arb.HubActivityQueue() > 7
+	return arb.assignedImageCount() < 7
 }
 
 func (arb *Arbiter) ListenForControllers() {
@@ -125,9 +113,7 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 	arb.releaseScanForPeer(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
-	arb.DeQueueHubActivity()
-
-	log.Printf("Done abortScan - Hub jobs: %d", arb.HubActivityQueue())
+	log.Printf("Done abortScan - Hub jobs: %d", arb.assignedImageCount())
 
 }
 
@@ -138,6 +124,14 @@ func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon,
 
 	cd.AbortScan(image.ImageSpec)
 	delete(arb.assignedImages, imageHash)
+}
+
+func (arb *Arbiter) assignedImageCount() int {
+
+	arb.Lock()
+	defer arb.Unlock()
+
+	return len(arb.assignedImages)
 }
 
 func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
@@ -169,9 +163,8 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 	arb.finalizeScan(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
-	arb.DeQueueHubActivity()
 
-	log.Printf("Done scanDone - Hub jobs: %d", arb.HubActivityQueue())
+	log.Printf("Done scanDone - Hub jobs: %d", arb.assignedImageCount())
 
 }
 
@@ -235,27 +228,29 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 	var i imageInfo
 	var resp imageResult
 
-	if !arb.CanSendHubJobs() {
-		resp.RequestId = "" 
-		resp.StartScan = false 
-		resp.SkipScan = false
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("Error encoding busy image response: %s\n", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-
-		log.Println("Done assignScan - Hub currently busy with other jobs. Requeue.")
-	}
-
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
 	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
 		log.Printf("Got junk on assignScan API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
+		return
+	}
+
+	if !arb.CanSendHubJobs() {
+		resp.RequestId = ""
+		resp.StartScan = false
+		resp.SkipScan = false
+
+		w.WriteHeader(http.StatusOK)
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			log.Printf("Error encoding busy image response: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Done assignScan - Hub currently busy with other jobs. Requeue %s. - Hub jobs: %d", i.ImageSpec, arb.assignedImageCount())
 		return
 	}
 
@@ -269,15 +264,15 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 
 	resp.RequestId, resp.StartScan, resp.SkipScan = arb.findWorker(i.ImageSpec, cd)
 
+	w.WriteHeader(http.StatusOK)
+
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding image response: %s\n", err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	arb.QueueHubActivity()
-	log.Printf("Done assignScan - Hub jobs: %d", arb.HubActivityQueue())
+	log.Printf("Done assignScan - Hub jobs: %d", arb.assignedImageCount())
 }
 
 func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool, bool) {
@@ -343,8 +338,31 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	cd, ok := arb.controllerDaemons[i.ControllerID]
 	if !ok {
 		log.Printf("Unknown controller [%s] identified image: %s\n", i.ControllerID, i.ImageSpec)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	reqHash, requested := arb.requestedImages[i.ImageSpec]
+	if requested {
+		assignedImage, ok := arb.assignedImages[reqHash]
+		if ok && strings.Compare(cd.info.Id, assignedImage.ControllerID) == 0 {
+			// we can get into a weird race condition during s2i builds, only want to scan once
+			log.Printf("Image %s is already identified for controller %s - Skipping.\n", i.ImageSpec, assignedImage.ControllerID)
+
+			var resp imageResult
+			resp.RequestId = ""
+			resp.StartScan = false
+			resp.SkipScan = true
+
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("Error encoding image response: %s\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			return
+		}
 	}
 
 	var resp imageResult
@@ -356,7 +374,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding image response: %s\n", err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
