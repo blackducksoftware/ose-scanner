@@ -53,19 +53,16 @@ func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false, info
 	}
-
 	info.Annotations = image.ObjectMeta.Annotations
 	if info.Annotations == nil {
 		log.Printf("Image %s has no annotations - creating object.\n", job.ScanImage.sha)
 		info.Annotations = make(map[string]string)
 	}
-
 	info.Labels = image.ObjectMeta.Labels
 	if info.Labels == nil {
 		log.Printf("Image %s has no labels - creating object.\n", job.ScanImage.sha)
 		info.Labels = make(map[string]string)
 	}
-
 	return true, info
 }
 

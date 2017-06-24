@@ -63,7 +63,6 @@ func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 		log.Printf("Image %s has no labels - creating object.\n", job.ScanImage.digest)
 		info.Labels = make(map[string]string)
 	}
-
 	return true, info
 }
 
