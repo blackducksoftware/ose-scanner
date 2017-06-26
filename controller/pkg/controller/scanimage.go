@@ -94,6 +94,8 @@ func (image ScanImage) getArgs() []string {
 
 }
 
+// scan queues a request for scanning.
+// TODO Rename this to "addScanToQueue".
 func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
 
 	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
