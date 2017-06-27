@@ -64,10 +64,10 @@ func mapMerge(base map[string]string, new map[string]string) map[string]string {
 	for k,v := range new {
 		// if we're overwriting w/ a new value, log.  Don't overlog b/c we expect the arbiter
 		// to overwrite quite often (every 30 minutes checks in with KB).
-		if newMap[k] != "" && v != newMap[k] {
+		if v != newMap[k] {
 			log.Printf("Image annotation update: [ %s ] FROM %s TO %s", k, newMap[k], v)
-			newMap[k] = v
 		}
+		newMap[k] = v
 	}
 	return newMap
 }
