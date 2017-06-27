@@ -56,17 +56,18 @@ func NewAnnotator(ScannerVersion string, HubServer string) *Annotator {
 
 func mapMerge(base map[string]string, new map[string]string) map[string]string {
 	newMap := make(map[string]string)
-
 	if base != nil {
 		for k, v := range base {
 			newMap[k] = v
 		}
 	}
 	for k,v := range new {
-		if newMap[k] != "" {
-			log.Printf("Warning! Overwriting %d with value %d->%d",k, v, v)
+		// if we're overwriting w/ a new value, log.  Don't overlog b/c we expect the arbiter
+		// to overwrite quite often (every 30 minutes checks in with KB).
+		if newMap[k] != "" && v != newMap[k] {
+			log.Printf("Image annotation update: [ %s ] FROM %s TO %s", k, newMap[k], v)
+			newMap[k] = v
 		}
-		newMap[k]=v
 	}
 	return newMap
 }
