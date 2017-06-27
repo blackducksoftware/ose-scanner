@@ -38,6 +38,17 @@ func TestMapMerge(t *testing.T) {
 	if c["c"] != "e" {
 		t.Fail()
 	}
+
+	// make sure mutations work right, run w/ -v to make sure logging is working right.
+	a = map[string]string{}
+	b = map[string]string{"a":"b","c":"e"}
+	c = mapMerge(a,b)
+	if len(c) != 2{
+		t.Fail()
+	}
+	if c["c"] != "e" {
+		t.Fail()
+	}
 }
 
 func TestOpenshiftAnnotations(t *testing.T) {
