@@ -4,7 +4,7 @@ BUILD_NUMBER_FILE=build.txt
 all: clean build tar-install release-docker
 
 clean: 
-	rm -Rf ./output/$(BDS_VER); mkdir ./output/$(BDS_VER);
+	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
 
 build:
 	$(eval OS_BUILD_NUMBER=$(shell cat $(BUILD_NUMBER_FILE)))
