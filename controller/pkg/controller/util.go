@@ -6,5 +6,5 @@ import "time"
 func RunWithTime(f func()) time.Duration {
 	start := time.Now()
 	f()
-	return time.Since(start);
+	return time.Since(start)
 }

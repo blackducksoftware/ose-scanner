@@ -16,13 +16,19 @@ ENV PATH=${APP_HOME}/bin:${JAVA_HOME}/bin:${PATH}
 COPY ./output/ose_scanner /ose_scanner
 COPY ./hub_scanner/scan.cli/scan.cli-${bds_ver} /scan.cli-${bds_ver}
 COPY ./LICENSE /LICENSE
+COPY ./help.1 /help.1
 
-LABEL vendor="Black Duck Software" \
+LABEL name="Black Duck Insight for OpenShift Scanner" \
+      vendor="Black Duck Software" \
+      version="${bds_ver}" \
+      release="1" \
+      summary="Black Duck Insight for OpenShift Scanner" \
+      description="Scan engine for Insight for OpenShift" \
       com.blackducksoftware.version="${bds_ver}" \
       com.blackducksoftware.product="Hub" \
       com.blackducksoftware.platform="OpenShift" \
       com.blackducksoftware.platform.version="${bds_ver}" \
-      com.blackducksoftware.platform.component="Hub Scanner" 
+      com.blackducksoftware.platform.component="Insight for OpenShift Scanner" 
 
 ENTRYPOINT [ "/ose_scanner" ]
 EXPOSE 9036
