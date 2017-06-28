@@ -21,7 +21,11 @@ docker-install:
 	mkdir ./output/$(BDS_VER)/docker
 	./build-docker-installer.sh $(BDS_VER)
 
-travis: clean build
+travis: 
+	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
+	cd ./scanner; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
+	cd ./controller; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
+	cd ./arbiter; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
 
 release: build-num all 
 
