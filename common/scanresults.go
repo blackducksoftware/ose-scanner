@@ -104,6 +104,7 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 
 	vulnerabilities := 0
 	violations := 0
+	projectVersionUI := ""
 
 	// we have a matching version for our image, need to locate the risk-profile
 	for _, Item := range projectVersion.Meta.Links {
@@ -133,11 +134,16 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 			}
 
 		}
+
+		if strings.Compare(Item.Rel, "components") == 0 {
+			projectVersionUI = Item.Href
+		}
+
 	}
 
 	log.Printf("Found %d high severity vulnerabilities and %d policy violations for %s:%s\n", vulnerabilities, violations, taggedName, imageId[:10])
 
-	results = annotate.UpdateAnnotations(info, sha, violations, vulnerabilities, projectVersionUrl, scanId)
+	results = annotate.UpdateAnnotations(info, sha, violations, vulnerabilities, projectVersionUrl, scanId, projectVersionUI)
 
 	return nil, results
 }
@@ -170,6 +176,7 @@ func ProjectVersionResults(info ImageInfo, imageId string, taggedName string, sh
 
 	vulnerabilities := 0
 	violations := 0
+	projectVersionUI := ""
 
 	// we have a matching version for our image, need to locate the risk-profile
 	for _, Item := range projectVersion.Meta.Links {
@@ -199,11 +206,15 @@ func ProjectVersionResults(info ImageInfo, imageId string, taggedName string, sh
 			}
 
 		}
+
+		if strings.Compare(Item.Rel, "components") == 0 {
+			projectVersionUI = Item.Href
+		}
 	}
 
 	log.Printf("Found %d high severity vulnerabilities and %d policy violations for %s:%s\n", vulnerabilities, violations, taggedName, imageId[:10])
 
-	results = annotate.UpdateAnnotations(info, sha, violations, vulnerabilities, projectVersionUrl, scanId)
+	results = annotate.UpdateAnnotations(info, sha, violations, vulnerabilities, projectVersionUrl, scanId, projectVersionUI)
 
 	return nil, results
 }

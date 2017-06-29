@@ -74,7 +74,7 @@ func mapMerge(base map[string]string, new map[string]string) map[string]string {
 
 // UpdateAnnotations creates a NEW image from an old one, and returns a new image info with annotations and labels from scan results.
 // TODO Rename this function to express the fact that it isn't actually updating any data structure, but rather creating a new one.
-func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string) ImageInfo {
+func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string, projectVersionUIUrl string) ImageInfo {
 	policy := "None"
 	hasPolicyViolations := "false"
 
@@ -111,8 +111,8 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	//annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
 
 	// No reason to expect an error here.  TODO, put a human readable reference URL in as the final arg.
-	vulnAnnotations :=	a.CreateBlackduckVulnerabilityAnnotation(hasVulns=="true","")
-	policyAnnotations :=	a.CreateBlackduckPolicyAnnotation(hasPolicyViolations=="true","")
+	vulnAnnotations :=	a.CreateBlackduckVulnerabilityAnnotation(hasVulns=="true", projectVersionUIUrl )
+	policyAnnotations :=	a.CreateBlackduckPolicyAnnotation(hasPolicyViolations=="true",projectVersionUIUrl )
 
 	inputImageInfo.Annotations["quality.images.openshift.io/vulnerability.blackduck"] = vulnAnnotations.AsString()
 	inputImageInfo.Annotations["quality.images.openshift.io/policy.blackduck"] = policyAnnotations.AsString()
