@@ -3,6 +3,8 @@ BUILD_NUMBER_FILE=build.txt
 
 all: clean build tar-install release-docker
 
+tar-build: clean build tar-install
+
 clean: 
 	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
 
@@ -18,7 +20,7 @@ tar-install:
 	./build-tar-installer.sh $(BDS_VER)
 
 docker-install:
-	mkdir ./output/$(BDS_VER)/docker
+	rm -Rf ./output/$(BDS_VER)/docker; mkdir ./output/$(BDS_VER)/docker
 	./build-docker-installer.sh $(BDS_VER)
 
 travis: 
