@@ -6,6 +6,65 @@
 #
 
 #set -x
+
+#
+# URI parsing function
+# Source: http://wp.vpalos.com/537/uri-parsing-using-bash-built-in-features/
+#
+# The function creates global variables with the parsed results.
+# It returns 0 if parsing was successful or non-zero otherwise.
+#
+# [schema://][user[:password]@]host[:port][/path][?[arg1=val1]...][#fragment]
+#
+function uri_parser {
+    # uri capture
+    uri="$@"
+
+    # safe escaping
+    uri="${uri//\`/%60}"
+    uri="${uri//\"/%22}"
+
+    # top level parsing
+    pattern='^(([a-z]{3,5})://)?((([^:\/]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
+    [[ "$uri" =~ $pattern ]] || return 1;
+
+    # component extraction
+    uri=${BASH_REMATCH[0]}
+    uri_schema=${BASH_REMATCH[2]}
+    uri_address=${BASH_REMATCH[3]}
+    uri_user=${BASH_REMATCH[5]}
+    uri_password=${BASH_REMATCH[7]}
+    uri_host=${BASH_REMATCH[8]}
+    uri_port=${BASH_REMATCH[10]}
+    uri_path=${BASH_REMATCH[11]}
+    uri_query=${BASH_REMATCH[12]}
+    uri_fragment=${BASH_REMATCH[13]}
+
+    # path parsing
+    count=0
+    path="$uri_path"
+    pattern='^/+([^/]+)'
+    while [[ $path =~ $pattern ]]; do
+        eval "uri_parts[$count]=\"${BASH_REMATCH[1]}\""
+        path="${path:${#BASH_REMATCH[0]}}"
+        let count++
+    done
+
+    # query parsing
+    count=0
+    query="$uri_query"
+    pattern='^[?&]+([^= ]+)(=([^&]*))?'
+    while [[ $query =~ $pattern ]]; do
+        eval "uri_args[$count]=\"${BASH_REMATCH[1]}\""
+        eval "uri_arg_${BASH_REMATCH[1]}=\"${BASH_REMATCH[3]}\""
+        query="${query:${#BASH_REMATCH[0]}}"
+        let count++
+    done
+
+    # return success
+    return 0
+}
+
 clear
 echo "============================================"
 echo "Black Duck Insight for OpenShift Installation"
@@ -24,6 +83,27 @@ DEF_OSSERVER="https://$DEF_OSSERVER:8443"
 DEF_MASTER=0
 
 read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
+
+allow_insecure="false"
+
+uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
+
+if [ "$uri_schema" == "https" -a -z "$uri_port" ];
+then
+	echo "Do you wish to validate HTTPS certificates?"
+	select yn in "Yes" "No"; do
+    		case $yn in
+        		Yes ) allow_insecure="false"; break;;
+        		No ) allow_insecure="true"; break;;
+    		esac
+	done
+
+	uri_port="443"
+elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
+then
+	uri_port="80"
+fi
+
 read -p "Hub user name [$DEF_HUBUSER]: " hubuser
 read -sp "Hub password: " hubpassword
 echo ""
@@ -93,63 +173,6 @@ workers="${workers:-$DEF_WORKERS}"
 osserver="${osserver:-$DEF_OSSERVER}"
 hubuser="${hubuser:-$DEF_HUBUSER}"
 
-#
-# URI parsing function
-# Source: http://wp.vpalos.com/537/uri-parsing-using-bash-built-in-features/
-#
-# The function creates global variables with the parsed results.
-# It returns 0 if parsing was successful or non-zero otherwise.
-#
-# [schema://][user[:password]@]host[:port][/path][?[arg1=val1]...][#fragment]
-#
-function uri_parser {
-    # uri capture
-    uri="$@"
-
-    # safe escaping
-    uri="${uri//\`/%60}"
-    uri="${uri//\"/%22}"
-
-    # top level parsing
-    pattern='^(([a-z]{3,5})://)?((([^:\/]+)(:([^@\/]*))?@)?([^:\/?]+)(:([0-9]+))?)(\/[^?]*)?(\?[^#]*)?(#.*)?$'
-    [[ "$uri" =~ $pattern ]] || return 1;
-
-    # component extraction
-    uri=${BASH_REMATCH[0]}
-    uri_schema=${BASH_REMATCH[2]}
-    uri_address=${BASH_REMATCH[3]}
-    uri_user=${BASH_REMATCH[5]}
-    uri_password=${BASH_REMATCH[7]}
-    uri_host=${BASH_REMATCH[8]}
-    uri_port=${BASH_REMATCH[10]}
-    uri_path=${BASH_REMATCH[11]}
-    uri_query=${BASH_REMATCH[12]}
-    uri_fragment=${BASH_REMATCH[13]}
-
-    # path parsing
-    count=0
-    path="$uri_path"
-    pattern='^/+([^/]+)'
-    while [[ $path =~ $pattern ]]; do
-        eval "uri_parts[$count]=\"${BASH_REMATCH[1]}\""
-        path="${path:${#BASH_REMATCH[0]}}"
-        let count++
-    done
-
-    # query parsing
-    count=0
-    query="$uri_query"
-    pattern='^[?&]+([^= ]+)(=([^&]*))?'
-    while [[ $query =~ $pattern ]]; do
-        eval "uri_args[$count]=\"${BASH_REMATCH[1]}\""
-        eval "uri_arg_${BASH_REMATCH[1]}=\"${BASH_REMATCH[3]}\""
-        query="${query:${#BASH_REMATCH[0]}}"
-        let count++
-    done
-
-    # return success
-    return 0
-}
 
 oc project blackduck-scan
 
@@ -184,21 +207,12 @@ secretfile=$(mktemp /tmp/hub_ose_controller.XXXXXX)
 
 cp ./secret.yaml ${secretfile}
 
-uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
-
-if [ "$uri_schema" == "https" -a -z "$uri_port" ];
-then
-	uri_port="443"
-elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
-then
-	uri_port="80"
-fi
-
 sed -i "s/%USER%/${hubuser}/g" ${secretfile}
 sed -i "s/%PASSWD%/${hubpassword}/g" ${secretfile}
 sed -i "s/%HOST%/${uri_host}/g" ${secretfile}
 sed -i "s/%SCHEME%/${uri_schema}/g" ${secretfile}
 sed -i "s/%PORT%/${uri_port}/g" ${secretfile}
+sed -i "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
 
 if [ ! -z "`oc get secrets | grep bds-controller-credentials`" ];
 then

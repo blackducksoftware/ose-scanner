@@ -23,11 +23,11 @@ under the License.
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
 	"time"
-	"encoding/json"
 )
 
 const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
@@ -61,7 +61,7 @@ func mapMerge(base map[string]string, new map[string]string) map[string]string {
 			newMap[k] = v
 		}
 	}
-	for k,v := range new {
+	for k, v := range new {
 		// if we're overwriting w/ a new value, log.  Don't overlog b/c we expect the arbiter
 		// to overwrite quite often (every 30 minutes checks in with KB).
 		if v != newMap[k] {
@@ -98,7 +98,6 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	newLabels["com.blackducksoftware.image.has-vulnerabilities"] = hasVulns
 	inputImageInfo.Labels = mapMerge(inputImageInfo.Labels, newLabels)
 
-
 	newAnnotations := make(map[string]string)
 	newAnnotations[scannerVersionLabel] = a.ScannerVersion
 	newAnnotations[scannerHubServerLabel] = a.HubServer
@@ -111,8 +110,8 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	//annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
 
 	// No reason to expect an error here.  TODO, put a human readable reference URL in as the final arg.
-	vulnAnnotations :=	a.CreateBlackduckVulnerabilityAnnotation(hasVulns=="true", projectVersionUIUrl )
-	policyAnnotations :=	a.CreateBlackduckPolicyAnnotation(hasPolicyViolations=="true",projectVersionUIUrl )
+	vulnAnnotations := a.CreateBlackduckVulnerabilityAnnotation(hasVulns == "true", projectVersionUIUrl)
+	policyAnnotations := a.CreateBlackduckPolicyAnnotation(hasPolicyViolations == "true", projectVersionUIUrl)
 
 	inputImageInfo.Annotations["quality.images.openshift.io/vulnerability.blackduck"] = vulnAnnotations.AsString()
 	inputImageInfo.Annotations["quality.images.openshift.io/policy.blackduck"] = policyAnnotations.AsString()
@@ -120,14 +119,13 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	return inputImageInfo
 }
 
-
 type BlackduckAnnotation struct {
-	name string `json:"name"`
-	description string `json:"description"`
-	timestamp time.Time `json:"timestamp"`
-	reference string `json:"reference"`
-	compliant bool `json:"compliant"`
-	summary []map[string]string `json:"summary"`
+	name        string              `json:"name"`
+	description string              `json:"description"`
+	timestamp   time.Time           `json:"timestamp"`
+	reference   string              `json:"reference"`
+	compliant   bool                `json:"compliant"`
+	summary     []map[string]string `json:"summary"`
 }
 
 // AsString makes a map corresponding to the Openshift Container Security guide (https://people.redhat.com/aweiteka/docs/preview/20170510/security/container_content.html).
@@ -135,11 +133,11 @@ func (o *BlackduckAnnotation) AsString() string {
 	m := make(map[string]string)
 	m["name"] = o.name
 	m["description"] = o.description
-	m["timestamp"] = fmt.Sprintf("%v",o.timestamp)
+	m["timestamp"] = fmt.Sprintf("%v", o.timestamp)
 	m["reference"] = o.reference
-	m["compliant"] = fmt.Sprintf("%v",o.compliant)
-	m["summary"] = fmt.Sprintf("%s",o.summary)
-	mp,_ := json.Marshal(m)
+	m["compliant"] = fmt.Sprintf("%v", o.compliant)
+	m["summary"] = fmt.Sprintf("%s", o.summary)
+	mp, _ := json.Marshal(m)
 	return string(mp)
 }
 
@@ -153,14 +151,14 @@ func (a *Annotator) CreateBlackduckVulnerabilityAnnotation(hasVulns bool, humanR
 		!hasVulns, // no vunls -> compliant.
 		[]map[string]string{
 			{
-				"label":"high",
-				"score":fmt.Sprintf("%v",1),
-				"severityIndex":fmt.Sprintf("%v",1),
+				"label":         "high",
+				"score":         fmt.Sprintf("%v", 1),
+				"severityIndex": fmt.Sprintf("%v", 1),
 			},
 		},
 	}
 }
-func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, humanReadableURL string, ) *BlackduckAnnotation {
+func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, humanReadableURL string) *BlackduckAnnotation {
 	return &BlackduckAnnotation{
 		"blackducksoftware",
 		"Policy Info",
@@ -169,14 +167,13 @@ func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, hu
 		!hasPolicyViolations, // no violations -> compliant
 		[]map[string]string{
 			{
-				"label":"important",
-				"score":fmt.Sprintf("%v",1),
-				"severityIndex":fmt.Sprintf("%v",1),
+				"label":         "important",
+				"score":         fmt.Sprintf("%v", 1),
+				"severityIndex": fmt.Sprintf("%v", 1),
 			},
 		},
 	}
 }
-
 
 // Determine if a scan of the specified image is required
 func (a *Annotator) IsScanNeeded(info ImageInfo, ref string, hubConfig *HubConfig) bool {

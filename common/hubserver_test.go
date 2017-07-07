@@ -1,13 +1,13 @@
 package common
 
 import (
-	"testing"
-	"net/http/httptest"
-	"time"
-	"net/http"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"testing"
+	"time"
 )
 
 // Although this test is slow, it should run okay in a parallel suite.
@@ -30,14 +30,14 @@ func TestClientDoesntHang(t *testing.T) {
 		// simulate a hub response that never, ever, ever returns.
 		for {
 			select {
-				// shutdown hook for the unit test.
-				case <-testResult:
-					log.Println("Test result obtained. Exiting inifinte request time simulator.")
-					return
-				// simulate 'the hub' being down.
-				default:
-					log.Println("Test still running.",time.Now())
-					time.Sleep(1 * time.Second)
+			// shutdown hook for the unit test.
+			case <-testResult:
+				log.Println("Test result obtained. Exiting inifinte request time simulator.")
+				return
+			// simulate 'the hub' being down.
+			default:
+				log.Println("Test still running.", time.Now())
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}))
@@ -50,7 +50,7 @@ func TestClientDoesntHang(t *testing.T) {
 		_, err := NewHubServer(nil).client.Get(svr.URL)
 		if err != nil {
 			// finished the Get operation, returning.
-			requestCompleted <- fmt.Sprintf("yay, i completed with an error %v",err)
+			requestCompleted <- fmt.Sprintf("yay, i completed with an error %v", err)
 			return
 		} else {
 			// This should never happen unless this test is borked.
@@ -63,13 +63,13 @@ func TestClientDoesntHang(t *testing.T) {
 	go webGet()
 	for {
 		select {
-			case <-requestCompleted:
-				testResult <- true
-				return
-			case <-time.After(totalAllowedTime):
-				testResult <- false
-				t.Fail()
-				return
+		case <-requestCompleted:
+			testResult <- true
+			return
+		case <-time.After(totalAllowedTime):
+			testResult <- false
+			t.Fail()
+			return
 		}
 	}
 

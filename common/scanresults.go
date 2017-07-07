@@ -56,19 +56,16 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 			return errors.New(e), info
 		}
 
-		log.Printf("Scan status: %s\n", scanSummary.Status)
-
-		if strings.Compare(scanSummary.Status, "ERROR") == 0 {
-			e := fmt.Sprintf("ERROR processing scan summary for image: %s", imageId)
+		switch scanSummary.Status {
+		case "ERROR", "ERROR_BUILDING_BOM", "ERROR_MATCHING", "ERROR_SAVING_SCAN_DATA", "ERROR_SCANNING", "CANCELLED":
+			e := fmt.Sprintf("%s processing scan summary for image: %s", scanSummary.Status, imageId)
 			log.Printf("%s\n", e)
 			return errors.New(e), info
+		default:
+			log.Printf("Scan status: %s\n", scanSummary.Status)
+
 		}
 
-		if strings.Compare(scanSummary.Status, "ERROR_BUILDING_BOM") == 0 {
-			e := fmt.Sprintf("ERROR building BOM for image: %s", imageId)
-			log.Printf("%s\n", e)
-			return errors.New(e), info
-		}
 	}
 
 	codeLocationUrl := ""

@@ -59,6 +59,11 @@ spec:
               secretKeyRef:
                 name: bds-controller-credentials
                 key: password
+          - name: BDS_INSECURE_HTTPS
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: insecuretls
           - name: BDS_SCANNER
             value: '%SCANNER%'
           - name: BDS_WORKERS

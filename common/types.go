@@ -39,6 +39,8 @@ type HubConfig struct {
 	Scheme   string `json:"scheme"`
 	User     string `json:"user"`
 	Password string `json:"password"`
+	Insecure string `json:"insecuretls"`
+	Wire     *http.Transport
 }
 
 type CodeLocationStruct struct {
@@ -49,13 +51,13 @@ type CodeLocationStruct struct {
 	UpdatedAt            time.Time `json:"updatedAt"`
 	MappedProjectVersion string    `json:"mappedProjectVersion"`
 	Meta                 struct {
-				     Allow []string `json:"allow"`
-				     Href  string   `json:"href"`
-				     Links []struct {
-					     Rel  string `json:"rel"`
-					     Href string `json:"href"`
-				     } `json:"links"`
-			     } `json:"_meta"`
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
 }
 
 type CodeLocationsStruct struct {
@@ -67,19 +69,19 @@ type CodeLocationsStruct struct {
 		UpdatedAt            time.Time `json:"updatedAt"`
 		MappedProjectVersion string    `json:"mappedProjectVersion"`
 		Meta                 struct {
-					     Allow []string `json:"allow"`
-					     Href  string   `json:"href"`
-					     Links []struct {
-						     Rel  string `json:"rel"`
-						     Href string `json:"href"`
-					     } `json:"links"`
-				     } `json:"_meta"`
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
 	} `json:"items"`
 	Meta struct {
-			   Allow []string      `json:"allow"`
-			   Href  string        `json:"href"`
-			   Links []interface{} `json:"links"`
-		   } `json:"_meta"`
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
 	AppliedFilters []interface{} `json:"appliedFilters"`
 }
 
@@ -87,13 +89,13 @@ type ScanSummaryStruct struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"createdAt"`
 	Meta      struct {
-			  Allow []string `json:"allow"`
-			  Href  string   `json:"href"`
-			  Links []struct {
-				  Rel  string `json:"rel"`
-				  Href string `json:"href"`
-			  } `json:"links"`
-		  } `json:"_meta"`
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
@@ -103,20 +105,20 @@ type codeLocationsScanSummariesStruct struct {
 		Status    string    `json:"status"`
 		CreatedAt time.Time `json:"createdAt"`
 		Meta      struct {
-				  Allow []string `json:"allow"`
-				  Href  string   `json:"href"`
-				  Links []struct {
-					  Rel  string `json:"rel"`
-					  Href string `json:"href"`
-				  } `json:"links"`
-			  } `json:"_meta"`
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
 		UpdatedAt time.Time `json:"updatedAt"`
 	} `json:"items"`
 	Meta struct {
-			   Allow []string      `json:"allow"`
-			   Href  string        `json:"href"`
-			   Links []interface{} `json:"links"`
-		   } `json:"_meta"`
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
 	AppliedFilters []interface{} `json:"appliedFilters"`
 }
 
@@ -127,13 +129,13 @@ type projectsStruct struct {
 		ProjectLevelAdjustments bool   `json:"projectLevelAdjustments"`
 		Source                  string `json:"source"`
 		Meta                    struct {
-						Allow []string `json:"allow"`
-						Href  string   `json:"href"`
-						Links []struct {
-							Rel  string `json:"rel"`
-							Href string `json:"href"`
-						} `json:"links"`
-					} `json:"_meta"`
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
 	} `json:"items"`
 }
 
@@ -143,13 +145,13 @@ type projectVersionStruct struct {
 	Distribution string `json:"distribution"`
 	Source       string `json:"source"`
 	Meta         struct {
-			     Allow []string `json:"allow"`
-			     Href  string   `json:"href"`
-			     Links []struct {
-				     Rel  string `json:"rel"`
-				     Href string `json:"href"`
-			     } `json:"links"`
-		     } `json:"_meta"`
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
 }
 
 type projectVersionsStruct struct {
@@ -160,62 +162,62 @@ type projectVersionsStruct struct {
 		Distribution string `json:"distribution"`
 		Source       string `json:"source"`
 		Meta         struct {
-				     Allow []string `json:"allow"`
-				     Href  string   `json:"href"`
-				     Links []struct {
-					     Rel  string `json:"rel"`
-					     Href string `json:"href"`
-				     } `json:"links"`
-			     } `json:"_meta"`
+			Allow []string `json:"allow"`
+			Href  string   `json:"href"`
+			Links []struct {
+				Rel  string `json:"rel"`
+				Href string `json:"href"`
+			} `json:"links"`
+		} `json:"_meta"`
 	} `json:"items"`
 }
 
 type riskProfileStruct struct {
 	Categories struct {
-			   VERSION struct {
-					   HIGH    int `json:"HIGH"`
-					   MEDIUM  int `json:"MEDIUM"`
-					   LOW     int `json:"LOW"`
-					   OK      int `json:"OK"`
-					   UNKNOWN int `json:"UNKNOWN"`
-				   } `json:"VERSION"`
-			   VULNERABILITY struct {
-					   HIGH    int `json:"HIGH"`
-					   MEDIUM  int `json:"MEDIUM"`
-					   LOW     int `json:"LOW"`
-					   OK      int `json:"OK"`
-					   UNKNOWN int `json:"UNKNOWN"`
-				   } `json:"VULNERABILITY"`
-			   ACTIVITY struct {
-					   HIGH    int `json:"HIGH"`
-					   MEDIUM  int `json:"MEDIUM"`
-					   LOW     int `json:"LOW"`
-					   OK      int `json:"OK"`
-					   UNKNOWN int `json:"UNKNOWN"`
-				   } `json:"ACTIVITY"`
-			   LICENSE struct {
-					   HIGH    int `json:"HIGH"`
-					   MEDIUM  int `json:"MEDIUM"`
-					   LOW     int `json:"LOW"`
-					   OK      int `json:"OK"`
-					   UNKNOWN int `json:"UNKNOWN"`
-				   } `json:"LICENSE"`
-			   OPERATIONAL struct {
-					   HIGH    int `json:"HIGH"`
-					   MEDIUM  int `json:"MEDIUM"`
-					   LOW     int `json:"LOW"`
-					   OK      int `json:"OK"`
-					   UNKNOWN int `json:"UNKNOWN"`
-				   } `json:"OPERATIONAL"`
-		   } `json:"categories"`
+		VERSION struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"VERSION"`
+		VULNERABILITY struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"VULNERABILITY"`
+		ACTIVITY struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"ACTIVITY"`
+		LICENSE struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"LICENSE"`
+		OPERATIONAL struct {
+			HIGH    int `json:"HIGH"`
+			MEDIUM  int `json:"MEDIUM"`
+			LOW     int `json:"LOW"`
+			OK      int `json:"OK"`
+			UNKNOWN int `json:"UNKNOWN"`
+		} `json:"OPERATIONAL"`
+	} `json:"categories"`
 	Meta struct {
-			   Allow []string `json:"allow"`
-			   Href  string   `json:"href"`
-			   Links []struct {
-				   Rel  string `json:"rel"`
-				   Href string `json:"href"`
-			   } `json:"links"`
-		   } `json:"_meta"`
+		Allow []string `json:"allow"`
+		Href  string   `json:"href"`
+		Links []struct {
+			Rel  string `json:"rel"`
+			Href string `json:"href"`
+		} `json:"links"`
+	} `json:"_meta"`
 }
 
 type policyStatusStruct struct {
@@ -226,8 +228,8 @@ type policyStatusStruct struct {
 		Value int    `json:"value"`
 	} `json:"componentVersionStatusCounts"`
 	Meta struct {
-					     Allow []string      `json:"allow"`
-					     Href  string        `json:"href"`
-					     Links []interface{} `json:"links"`
-				     } `json:"_meta"`
+		Allow []string      `json:"allow"`
+		Href  string        `json:"href"`
+		Links []interface{} `json:"links"`
+	} `json:"_meta"`
 }

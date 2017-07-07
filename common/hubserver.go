@@ -32,11 +32,11 @@ import (
 	"time"
 )
 
-const hangtimeBeforeTimingOutOnTheHub = 10*time.Second
+const hangtimeBeforeTimingOutOnTheHub = 10 * time.Second
 
 type myjar struct {
 	// why is a jar a map of string->cookie1,cookie2,...?
-	jar map[string] []*http.Cookie
+	jar map[string][]*http.Cookie
 }
 
 // unused ?
@@ -49,10 +49,12 @@ func (p *myjar) Cookies(u *url.URL) []*http.Cookie {
 	return p.jar[u.Host]
 }
 
-func NewHubServer(config *HubConfig) *hubServer{
+func NewHubServer(config *HubConfig) *hubServer {
+
 	return &hubServer{
 		&http.Client{
-			Timeout: hangtimeBeforeTimingOutOnTheHub,
+			Timeout:   hangtimeBeforeTimingOutOnTheHub,
+			Transport: config.Wire,
 		},
 		config,
 	}

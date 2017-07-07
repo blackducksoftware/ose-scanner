@@ -47,6 +47,11 @@ items:
                 secretKeyRef:
                   name: bds-controller-credentials
                   key: password
+            - name: BDS_INSECURE_HTTPS
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: insecuretls
             - name: BDS_WORKERS
               value: '5'
             name: scan-arbiter
@@ -126,6 +131,11 @@ items:
                 secretKeyRef:
                   name: bds-controller-credentials
                   key: password
+            - name: BDS_INSECURE_HTTPS
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: insecuretls
             - name: BDS_SCANNER
               value: 'docker.io/blackducksoftware/hub_ose_scanner:%VERSION%'
             - name: BDS_WORKERS

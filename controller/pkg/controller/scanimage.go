@@ -81,6 +81,9 @@ func (image ScanImage) getArgs() []string {
 	args = append(args, "-w")
 	args = append(args, image.config.Password)
 
+	args = append(args, "-insecure")
+	args = append(args, image.config.Insecure)
+
 	args = append(args, "-id")
 	args = append(args, image.imageId)
 
@@ -129,7 +132,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 		return image.results(info)
 	}
 
-	return image.results(info)
+	return nil, info
 
 }
 

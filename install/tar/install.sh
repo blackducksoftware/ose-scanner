@@ -6,84 +6,6 @@
 #
 
 #set -x
-clear
-echo "============================================"
-echo "Black Duck Insight for OpenShift Installation"
-echo "============================================"
-
-# Docker push will fail otherwise
-if [ $UID -ne 0 ]; then
-  echo -e "\nThis script must be run as root\n"
-  exit 1
-fi
-
-echo " "
-echo "============================================"
-echo "Black Duck Hub Configuration Information"
-echo "============================================"
-
-#set defaults
-DEF_WORKERS="2"
-DEF_HUBUSER="sysadmin"
-DEF_OSSERVER=`hostname -f`
-DEF_OSSERVER="https://$DEF_OSSERVER:8443"
-DEF_MASTER=0
-
-read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
-read -p "Hub user name [$DEF_HUBUSER]: " hubuser
-read -sp "Hub password: " hubpassword
-
-echo " "
-read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
-
-echo "============================================"
-echo "OpenShift Configuration"
-echo "============================================"
-echo " "
-
-# Are we running on a master node or not?
-if [ -e /etc/origin/master/master-config.yaml ]; then
-    osserver=`grep masterPublicURL /etc/origin/master/master-config.yaml | egrep -o "https://.*[0-9]$" | head -n 1`
-    echo "Running on a Master --- Public URL: $osserver"
-
-    isclusteradmin=`oc describe clusterPolicyBindings | sed -n '/Role:[[:space:]]*cluster-admin/,/Groups:/p' | grep "Users:" | grep $(oc whoami) | wc -l`
-    if [ $? -ne 0 ]
-    then
-         echo "Unable to validate user. User must have cluster-admin rights."
-         exit 1
-    fi
-
-    if [ $isclusteradmin -ne "1" ]
-    then
-         echo "User does not have required cluster-admin rights."
-         exit 1
-    fi
-	
-    DEF_MASTER=1
-else
-    read -p "OpenShift Cluster [$DEF_OSSERVER]: " osserver
-    read -p "Cluster admin user name: " osuser
-    read -sp "Cluster admin password: " ospassword
-
-    oc login $osserver -u $osuser -p $ospassword
-
-    if [ $? -ne 0 ]
-    then
-         exit 1
-    fi
-fi
-
-echo " "
-
-#apply defaults
-workers="${workers:-$DEF_WORKERS}"
-osserver="${osserver:-$DEF_OSSERVER}"
-hubuser="${hubuser:-$DEF_HUBUSER}"
-
-echo "============================================"
-echo "OpenShift Configuration"
-echo "============================================"
-echo " "
 
 #
 # URI parsing function
@@ -143,12 +65,101 @@ function uri_parser {
     return 0
 }
 
-oc login $osserver -u $osuser -p $ospassword
+clear
+echo "============================================"
+echo "Black Duck Insight for OpenShift Installation"
+echo "============================================"
 
-if [ $? -ne 0 ]
-then
-	exit 1
+# Docker push will fail otherwise
+if [ $UID -ne 0 ]; then
+  echo -e "\nThis script must be run as root\n"
+  exit 1
 fi
+
+echo " "
+echo "============================================"
+echo "Black Duck Hub Configuration Information"
+echo "============================================"
+
+#set defaults
+DEF_WORKERS="2"
+DEF_HUBUSER="sysadmin"
+DEF_OSSERVER=`hostname -f`
+DEF_OSSERVER="https://$DEF_OSSERVER:8443"
+DEF_MASTER=0
+
+read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
+
+allow_insecure="false"
+
+uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
+
+if [ "$uri_schema" == "https" -a -z "$uri_port" ];
+then
+	echo "Do you wish to validate HTTPS certificates?"
+	select yn in "Yes" "No"; do
+    		case $yn in
+        		Yes ) allow_insecure="false"; break;;
+        		No ) allow_insecure="true"; break;;
+    		esac
+	done
+
+	uri_port="443"
+elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
+then
+	uri_port="80"
+fi
+
+read -p "Hub user name [$DEF_HUBUSER]: " hubuser
+read -sp "Hub password: " hubpassword
+
+echo " "
+read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
+
+echo "============================================"
+echo "OpenShift Configuration"
+echo "============================================"
+echo " "
+
+# Are we running on a master node or not?
+if [ -e /etc/origin/master/master-config.yaml ]; then
+    osserver=`grep masterPublicURL /etc/origin/master/master-config.yaml | egrep -o "https://.*[0-9]$" | head -n 1`
+    echo "Running on a Master --- Public URL: $osserver"
+
+    isclusteradmin=`oc describe clusterPolicyBindings | sed -n '/Role:[[:space:]]*cluster-admin/,/Groups:/p' | grep "Users:" | grep $(oc whoami) | wc -l`
+    if [ $? -ne 0 ]
+    then
+         echo "Unable to validate user. User must have cluster-admin rights."
+         exit 1
+    fi
+
+    if [ $isclusteradmin -ne "1" ]
+    then
+         echo "User does not have required cluster-admin rights."
+         exit 1
+    fi
+	
+    DEF_MASTER=1
+else
+    read -p "OpenShift Cluster [$DEF_OSSERVER]: " osserver
+    read -p "Cluster admin user name: " osuser
+    read -sp "Cluster admin password: " ospassword
+
+    oc login $osserver -u $osuser -p $ospassword
+
+    if [ $? -ne 0 ]
+    then
+         exit 1
+    fi
+fi
+
+echo " "
+
+#apply defaults
+workers="${workers:-$DEF_WORKERS}"
+osserver="${osserver:-$DEF_OSSERVER}"
+hubuser="${hubuser:-$DEF_HUBUSER}"
+
 
 oc project blackduck-scan
 
@@ -248,21 +259,12 @@ secretfile=$(mktemp /tmp/hub_ose_controller.XXXXXX)
 
 cp ./secret.yaml ${secretfile}
 
-uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
-
-if [ "$uri_schema" == "https" -a -z "$uri_port" ];
-then
-	uri_port="443"
-elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
-then
-	uri_port="80"
-fi
-
 sed -i "s/%USER%/${hubuser}/g" ${secretfile}
 sed -i "s/%PASSWD%/${hubpassword}/g" ${secretfile}
 sed -i "s/%HOST%/${uri_host}/g" ${secretfile}
 sed -i "s/%SCHEME%/${uri_schema}/g" ${secretfile}
 sed -i "s/%PORT%/${uri_port}/g" ${secretfile}
+sed -i "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
 
 if [ ! -z "`oc get secrets | grep bds-controller-credentials`" ];
 then
