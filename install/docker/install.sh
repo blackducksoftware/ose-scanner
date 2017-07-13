@@ -61,6 +61,14 @@ function uri_parser {
         let count++
     done
 
+    if [ "$uri_schema" == "https" -a -z "$uri_port" ];
+    then
+    	uri_port="443"
+    elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
+    then
+	uri_port="80"
+    fi
+
     # return success
     return 0
 }
@@ -88,7 +96,7 @@ allow_insecure="false"
 
 uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
 
-if [ "$uri_schema" == "https" -a -z "$uri_port" ];
+if [ "$uri_schema" == "https" ];
 then
 	echo "Do you wish to validate HTTPS certificates?"
 	select yn in "Yes" "No"; do
@@ -98,10 +106,6 @@ then
     		esac
 	done
 
-	uri_port="443"
-elif [ "$uri_schema" == "http" -a -z "$uri_port" ];
-then
-	uri_port="80"
 fi
 
 read -p "Hub user name [$DEF_HUBUSER]: " hubuser
