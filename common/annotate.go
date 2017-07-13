@@ -109,9 +109,8 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	//attestation := fmt.Sprintf("%s~%s", component, project)
 	//annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
 
-	// No reason to expect an error here.  TODO, put a human readable reference URL in as the final arg.
-	vulnAnnotations := a.CreateBlackduckVulnerabilityAnnotation(hasVulns == "true", projectVersionUIUrl)
-	policyAnnotations := a.CreateBlackduckPolicyAnnotation(hasPolicyViolations == "true", projectVersionUIUrl)
+	vulnAnnotations := a.CreateBlackduckVulnerabilityAnnotation(hasVulns == "true", projectVersionUIUrl, vulns)
+	policyAnnotations := a.CreateBlackduckPolicyAnnotation(hasPolicyViolations == "true", projectVersionUIUrl, policy)
 
 	inputImageInfo.Annotations["quality.images.openshift.io/vulnerability.blackduck"] = vulnAnnotations.AsString()
 	inputImageInfo.Annotations["quality.images.openshift.io/policy.blackduck"] = policyAnnotations.AsString()
@@ -142,7 +141,7 @@ func (o *BlackduckAnnotation) AsString() string {
 }
 
 // CreateOpenshiftAnnotations takes the primitive information from UpdateAnnotation and translates it to openshift.
-func (a *Annotator) CreateBlackduckVulnerabilityAnnotation(hasVulns bool, humanReadableURL string) *BlackduckAnnotation {
+func (a *Annotator) CreateBlackduckVulnerabilityAnnotation(hasVulns bool, humanReadableURL string, vulnCount string) *BlackduckAnnotation {
 	return &BlackduckAnnotation{
 		"blackducksoftware",
 		"Vulnerability Info",
@@ -152,13 +151,13 @@ func (a *Annotator) CreateBlackduckVulnerabilityAnnotation(hasVulns bool, humanR
 		[]map[string]string{
 			{
 				"label":         "high",
-				"score":         fmt.Sprintf("%v", 1),
+				"score":         fmt.Sprintf("%s", vulnCount),
 				"severityIndex": fmt.Sprintf("%v", 1),
 			},
 		},
 	}
 }
-func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, humanReadableURL string) *BlackduckAnnotation {
+func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, humanReadableURL string, policyCount string) *BlackduckAnnotation {
 	return &BlackduckAnnotation{
 		"blackducksoftware",
 		"Policy Info",
@@ -168,7 +167,7 @@ func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, hu
 		[]map[string]string{
 			{
 				"label":         "important",
-				"score":         fmt.Sprintf("%v", 1),
+				"score":         fmt.Sprintf("%s", policyCount),
 				"severityIndex": fmt.Sprintf("%v", 1),
 			},
 		},
