@@ -16,6 +16,9 @@ ENV PATH=${APP_HOME}/bin:${JAVA_HOME}/bin:${PATH}
 COPY ./output/ose_scanner /ose_scanner
 COPY ./hub_scanner/scan.cli/scan.cli-${bds_ver} /scan.cli-${bds_ver}
 COPY ./LICENSE /LICENSE
+
+# Container catalog requirements
+COPY ./LICENSE /licenses/
 COPY ./help.1 /help.1
 
 LABEL name="Black Duck Insight for OpenShift Scanner" \

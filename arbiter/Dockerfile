@@ -8,6 +8,9 @@ COPY ./output/ose_arbiter /ose_arbiter
 COPY ./ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY ./LICENSE /LICENSE
 COPY ./NOTICE /NOTICE
+
+# Container catalog requirements
+COPY ./LICENSE /licenses/
 COPY ./help.1 /help.1
 
 LABEL name="Black Duck Insight for OpenShift Arbiter" \

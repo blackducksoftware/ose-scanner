@@ -98,6 +98,7 @@ func scanImage(path string, imageId string, taggedImage string, codeLocation str
 	cmd := exec.Command("java",
 		"-Xms512m",
 		"-Xmx4096m",
+		"-Dblackduck.scan.cli.benice=true",
 		"-Done-jar.silent=true",
 		"-Done-jar.jar.path="+scanCliImplJarPath,
 		"-jar", scanCliJarPath,
