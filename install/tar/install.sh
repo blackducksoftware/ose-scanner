@@ -171,7 +171,36 @@ if [ $? -ne 0 ]
 then
 	# adm required to ignore quotas
 	oc adm new-project blackduck-scan
+else
+	echo "Black Duck Insight scanner already installed. Do you wish to upgrade?"
+	select yn in "Yes" "No"; do
+    		case $yn in
+        		Yes ) echo "Upgrading existing installation at user request."
+				oc delete project blackduck-scan
+
+				echo "Wait for delete request to fully complete..."
+				sleep 5
+				
+				# wait for project resources to be removed
+				while true; do
+					oc project blackduck-scan
+
+					if [ $? -ne 0 ]
+					then
+						echo "Delete completed."
+						# adm required to ignore quotas
+						oc adm new-project blackduck-scan
+						break			
+					fi
+					sleep 3
+				done
+				break;;
+        		No ) echo "Aborting upgrade at user request."; exit 2; break;;
+    		esac
+	done
+
 fi
+
 
 # remove default node selector to ensure full scans
 oc annotate namespace blackduck-scan openshift.io/node-selector="" --overwrite
