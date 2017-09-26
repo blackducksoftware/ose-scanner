@@ -109,7 +109,9 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 		return errors.New("Invalid Docker connection"), info
 	}
 
-	if !docker.imageExists(image.digest) {
+	//if !docker.imageExists(image.digest) {
+
+	if !docker.imageExists(image.imageId) {
 		log.Printf("Image %s does not exist\n", image.digest)
 		return errors.New("Image does not exist"), info
 	}
@@ -150,7 +152,9 @@ func (image ScanImage) exists() bool {
 		return false
 	}
 
-	if !docker.imageExists(image.digest) {
+	//if !docker.imageExists(image.digest) {
+
+	if !docker.imageExists(image.imageId) {
 		log.Printf("Image %s does not exist\n", image.digest)
 		return false
 	}

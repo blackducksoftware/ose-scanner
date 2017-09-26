@@ -70,8 +70,9 @@ func (w Worker) Start() {
 func (w Worker) RequestScanAuthorization(job Job) {
 
 	spec := job.ScanImage.digest
+	id := job.ScanImage.imageId
 
-	log.Printf("Received scan job for image %s\n", spec)
+	log.Printf("Received scan job for image %s:%s\n", spec, id)
 
 	if !job.ScanImage.exists() {
 		log.Printf("Image %s not in local Docker engine. Skipping scan.\n", spec)
@@ -95,7 +96,7 @@ func (w Worker) RequestScanAuthorization(job Job) {
 		continue
 	}
 
-	_, skip := w.arbiter.alertImage(spec)
+	_, skip := w.arbiter.alertImage(spec, id)
 
 	if skip {
 		log.Printf("Skipping scan of alerted image at arbiter direction: %s\n", spec)
@@ -105,7 +106,7 @@ func (w Worker) RequestScanAuthorization(job Job) {
 	log.Printf("Requesting authorization to scan image %s\n", spec)
 
 	for {
-		requestHash, skip, startScan := w.arbiter.requestImage(spec)
+		requestHash, skip, startScan := w.arbiter.requestImage(spec, id)
 
 		if skip {
 			log.Printf("Skipping scan of image at arbiter direction: %s\n", spec)

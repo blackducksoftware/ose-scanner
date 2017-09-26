@@ -104,7 +104,7 @@ func (w *Watcher) Run() {
 
 	go k8sPodCtl.Run(wait.NeverStop)
 
-	log.Println("Watching image streams....")
+	log.Println("Watching pods....")
 
 	select {}
 }
@@ -187,8 +187,21 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 func (w *Watcher) PodCreated(pod *kapi.Pod) {
 	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
 
+	d := NewDocker()
+
 	for _, container := range pod.Spec.Containers {
 		log.Printf("\tPod container %s with image %s on pod %s\n", container.Name, container.Image, pod.ObjectMeta.Name)
-		w.controller.ScanPodImage(container.Image)
+
+		digests, imageId, found := d.digestFromImage(container.Image)
+
+		if !found {
+			log.Printf("\tPod image %s not found\n", container.Image)
+			continue
+		}
+
+		for _, digest := range digests {
+			log.Printf("\tFound pod image %s: %s\n", imageId, digest)
+			w.controller.AddImage(imageId, digest)
+		}
 	}
 }

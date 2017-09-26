@@ -411,7 +411,7 @@ func main() {
 	if strings.Contains(path, "<none>") {
 		log.Printf("WARNING: Image : %s won't be scanned.", digest)
 	} else {
-		newTarPath, err := saveImageToTar(client, digest, path)
+		newTarPath, err := saveImageToTar(client, image, path)
 
 		if err != nil {
 			log.Printf("Error while making tar file: %s\n", err)

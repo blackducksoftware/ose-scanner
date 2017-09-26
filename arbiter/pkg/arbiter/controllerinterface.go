@@ -42,6 +42,7 @@ import (
 type imageInfo struct {
 	ControllerID string `json:"id,omitempty"`
 	ImageSpec    string `json:"spec,omitempty"`
+	ImageId      string `json:"image,omitempty"`
 }
 
 type imageResult struct {
@@ -329,7 +330,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	var i imageInfo
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
-	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
+	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 || len(i.ImageId) == 0 {
 		log.Printf("Got junk on foundImage API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -366,7 +367,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var resp imageResult
-	resp.RequestId = arb.saveFoundImage(i.ImageSpec, cd)
+	resp.RequestId = arb.saveFoundImage(i.ImageSpec, i.ImageId, cd)
 	resp.StartScan = false
 	resp.SkipScan = false
 
@@ -382,7 +383,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (arb *Arbiter) saveFoundImage(spec string, cd *controllerDaemon) string {
+func (arb *Arbiter) saveFoundImage(spec string, id string, cd *controllerDaemon) string {
 	arb.Lock()
 	defer arb.Unlock()
 
@@ -391,7 +392,19 @@ func (arb *Arbiter) saveFoundImage(spec string, cd *controllerDaemon) string {
 		reqHashBytes := md5.Sum([]byte(spec))
 		reqHash = hex.EncodeToString(reqHashBytes[:])
 		arb.requestedImages[spec] = reqHash
-		log.Printf("Added spec %s as %s found by controller %s\n", spec, reqHash, cd.info.Id)
+		log.Printf("Added hash spec %s as %s found by controller %s\n", spec, reqHash, cd.info.Id)
+
+		/* test if the image was already discovered */
+		_, ok := arb.images[spec]
+		if !ok {
+
+			log.Printf("Image %s not represented in an ImageStream. Adding to our map.\n", spec)
+			/* this is essentially a clone of addImage(), but that can't be used here due to recursive locking */
+			imageItem := newScanImage(id, spec, arb.annotation)
+			log.Printf("Added external image %s to map\n", imageItem.digest)
+			arb.images[spec] = imageItem
+		}
+
 	}
 
 	cd.AddScanRequest(spec, reqHash)
