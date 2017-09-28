@@ -127,36 +127,79 @@ func (c *Controller) AddImage(ID string, Reference string) {
 	c.Lock()
 	defer c.Unlock()
 
-	_, ok := c.images[Reference]
+	image, ok := c.images[Reference]
 	if !ok {
 
 		imageItem := newScanImage(ID, Reference, c.annotation, c.hubParams.Config, c.hubParams.Scanner)
 
-		c.images[Reference] = imageItem
-
-		job := Job{
-			ScanImage:  imageItem,
-			controller: c,
+		if !imageItem.exists() {
+			log.Printf("Image %s:%s not present in node. Not adding to image map.\n", imageItem.digest, imageItem.imageId)
 		}
 
-		ok, info := job.GetAnnotationInfo()
-		if !ok {
-			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
+		c.queueImage(imageItem, Reference)
+
+	} else {
+		log.Printf("Image %s already in image map with imageId %s but have imageId %s\n", Reference, image.imageId, ID)
+
+		validOriginal := image.exists()
+		originalScanned := image.scanned
+
+		if !validOriginal {
+			log.Printf("Removing original imageId %s as it no longer exists on this node.\n", image.imageId)
+			delete(c.images, Reference)
 		}
 
-		if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
-			log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
-			imageItem.scanned = true
-			c.images[Reference] = imageItem
+		newImage := newScanImage(ID, Reference, c.annotation, c.hubParams.Config, c.hubParams.Scanner)
+		validUpdate := newImage.exists()
+		if !validUpdate {
+			log.Printf("Requested imageId %s does not exist on this node. Skipping.\n", image.imageId)
 			return
+		} else if validOriginal {
+			// we have both an original and an update which is valid
+			if originalScanned {
+				// since we see the original, and its been scanned, and it has the same pullspec, then we replace it and refresh
+				log.Printf("Replacing queued and scanned imageId %s with %s for image %s\n", image.imageId, newImage.imageId, Reference)
+				c.queueImage(newImage, Reference)
+			} else {
+				/*
+				* in this case we have both a unscanned original and an unscanned update
+				* not quite certain what to do here just yet TODO
+				 */
+				log.Printf("***ImageId %s hasn't been scanned, but we've found imageId %s for image %s as a replacement ****\n", image.imageId, newImage.imageId, Reference)
+				c.queueImage(newImage, Reference)
+			}
+		} else {
+			// add the image to queue
+			c.queueImage(newImage, Reference)
 		}
-
-		log.Printf("Added %s to image map\n", imageItem.digest)
-
-		job.Load()
-		c.jobQueue <- job
 
 	}
+
+}
+
+func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
+
+	job := Job{
+		ScanImage:  imageItem,
+		controller: c,
+	}
+
+	ok, info := job.GetAnnotationInfo()
+	if !ok {
+		log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
+	}
+
+	if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
+		log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
+		imageItem.scanned = true
+		return
+	}
+
+	c.images[Reference] = imageItem
+	log.Printf("Added %s:%s to image map\n", imageItem.digest, imageItem.imageId)
+
+	job.Load()
+	c.jobQueue <- job
 
 }
 
@@ -172,45 +215,6 @@ func (c *Controller) imageScanned(Reference string) bool {
 	}
 
 	return imageItem.scanned
-}
-
-func (c *Controller) ScanPodImage(Reference string) {
-
-	c.Lock()
-	defer c.Unlock()
-
-	imageItem, ok := c.images[Reference]
-	if !ok {
-		log.Printf("Requested scan from pod for unknown image %s\n", Reference)
-		return
-	}
-
-	if !imageItem.scanned {
-
-		job := Job{
-			ScanImage:  imageItem,
-			controller: c,
-		}
-
-		ok, info := job.GetAnnotationInfo()
-		if !ok {
-			log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
-		}
-
-		if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
-			log.Printf("Image sha %s previously scanned on a different node. Skipping.\n", imageItem.sha)
-			imageItem.scanned = true
-			c.images[Reference] = imageItem
-			return
-		}
-
-		log.Printf("Added %s from pod start to image map\n", imageItem.digest)
-
-		job.Load()
-		c.jobQueue <- job
-
-	}
-
 }
 
 func (c *Controller) RemoveImage(ID string, Reference string) {

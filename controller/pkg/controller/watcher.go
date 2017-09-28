@@ -187,6 +187,11 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 func (w *Watcher) PodCreated(pod *kapi.Pod) {
 	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
 
+	if pod.Status.Phase != kapi.PodRunning {
+		log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+		return
+	}
+
 	d := NewDocker()
 
 	for _, container := range pod.Spec.Containers {

@@ -155,7 +155,7 @@ func (image ScanImage) exists() bool {
 	//if !docker.imageExists(image.digest) {
 
 	if !docker.imageExists(image.imageId) {
-		log.Printf("Image %s does not exist\n", image.digest)
+		log.Printf("Image %s:%s does not exist\n", image.digest, image.imageId)
 		return false
 	}
 

@@ -17,6 +17,8 @@ all:
 	docker build --rm --build-arg bds_ver=$(BDS_SCANNER) -t hub_ose_scanner:$(BDS_SCANNER) -f Dockerfile .
 	docker save hub_ose_scanner:$(BDS_SCANNER) > ./output/hub_ose_scanner.tar
 
+	rm -Rf ./hub_scanner/scan.cli
+
 travis:
 	mkdir output
 	GOOS=linux GOARCH=amd64 go build -o ./output/ose_scanner .
