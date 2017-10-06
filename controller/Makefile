@@ -8,6 +8,7 @@ all:
 	rm -Rf ./output \
 	mkdir output
 
+	#Assumes build on Cent/RHEL7.x
 	\cp /etc/ssl/certs/ca-bundle.crt ca-certificates.crt
 	\cp ../LICENSE ./
 
