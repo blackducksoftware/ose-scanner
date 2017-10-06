@@ -4,8 +4,8 @@ cp -a ./LICENSE ./output/$1/tar/
 cp -a ./build.txt ./output/$1/tar/
 cd ./output/$1/tar/
 
-tar -czvf bdsocp$1.tar.gz *.tar *.yaml *.sh build.txt LICENSE
+tar -czvf bdsocp-$1.tar.gz *.tar *.yaml *.sh build.txt LICENSE
 
 cd ../../..
 
-\cp ./output/$1/tar/bdsocp$1.tar.gz ./release/
+\cp ./output/$1/tar/bdsocp-$1.tar.gz ./release/
