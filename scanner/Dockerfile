@@ -4,6 +4,9 @@ MAINTAINER Black Duck Hub Team
 RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical --setopt=tsflags=nodocs && yum clean all
 
 ARG bds_ver
+ARG LASTCOMMIT
+ARG BUILDTIME
+ARG BUILD
 
 ENV APP_HOME=/scan.cli-${bds_ver} \
     JAVA_HOME=/scan.cli-${bds_ver}/jre \
@@ -31,7 +34,10 @@ LABEL name="Black Duck Insight for OpenShift Scanner" \
       com.blackducksoftware.product="Hub" \
       com.blackducksoftware.platform="OpenShift" \
       com.blackducksoftware.platform.version="${bds_ver}" \
-      com.blackducksoftware.platform.component="Insight for OpenShift Scanner" 
+      com.blackducksoftware.platform.component="Insight for OpenShift Scanner" \ 
+      com.blackducksoftware.insight.lastcommit="$LASTCOMMIT" \
+      com.blackducksoftware.insight.buildtime="$BUILDTIME" \
+      com.blackducksoftware.insight.build="$BUILD"
 
 ENTRYPOINT [ "/ose_scanner" ]
 EXPOSE 9036

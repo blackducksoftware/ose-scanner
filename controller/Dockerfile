@@ -2,6 +2,9 @@ FROM scratch
 MAINTAINER Black Duck Hub Team
 
 ARG bds_ver
+ARG LASTCOMMIT
+ARG BUILDTIME
+ARG BUILD
 
 COPY ./output/controller /ose_controller
 COPY ./ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -22,7 +25,10 @@ LABEL name="Black Duck Insight for OpenShift Controller" \
       com.blackducksoftware.product="Hub" \
       com.blackducksoftware.platform="OpenShift" \
       com.blackducksoftware.platform.version="${bds_ver}" \
-      com.blackducksoftware.platform.component="Insight for OpenShift Controller Service" 
+      com.blackducksoftware.platform.component="Insight for OpenShift Controller Service" \ 
+      com.blackducksoftware.insight.lastcommit="$LASTCOMMIT" \
+      com.blackducksoftware.insight.buildtime="$BUILDTIME" \
+      com.blackducksoftware.insight.build="$BUILD"
 
 # Clear any existing entry points
 ENTRYPOINT ["/ose_controller"]
