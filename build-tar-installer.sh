@@ -8,4 +8,6 @@ tar -czvf bdsocp-$1.tar.gz *.tar *.yaml *.sh build.txt LICENSE
 
 cd ../../..
 
+mkdir -p ./release/
+
 \cp ./output/$1/tar/bdsocp-$1.tar.gz ./release/
