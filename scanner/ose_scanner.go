@@ -99,6 +99,7 @@ func scanImage(path string, imageId string, taggedImage string, codeLocation str
 		"-Xms512m",
 		"-Xmx4096m",
 		"-Dblackduck.scan.cli.benice=true",
+		"-Dblackduck.scan.skipUpdate=true",
 		"-Done-jar.silent=true",
 		"-Done-jar.jar.path="+scanCliImplJarPath,
 		"-jar", scanCliJarPath,
