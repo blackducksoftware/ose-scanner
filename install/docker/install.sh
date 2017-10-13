@@ -7,6 +7,89 @@
 
 #set -x
 
+options=$@
+
+WORKER_COUNT=2
+INSECURE_TLS=0
+UPGRADE=0
+HUB_VERSION="0.0.0"
+
+function cmdOptions() {
+
+    # An array with all the arguments
+    arguments=($options)
+
+    # Loop index
+    index=0
+
+    for argument in $options
+      do
+
+        index=`expr $index + 1`
+        case $argument in
+
+            --workers)
+                WORKER_COUNT=${arguments[index]} ;;
+
+            --hubversion)
+                HUB_VERSION=${arguments[index]} ;;
+
+            --insecuretls) INSECURE_TLS=1 ;;
+
+            --upgrade) UPGRADE=1 ;;
+
+        esac
+      done
+
+}
+
+function upgrade() {
+    echo "Upgrading existing installation at user request."
+    oc delete project blackduck-scan
+
+    echo "Wait for delete request to fully complete..."
+    sleep 5
+
+    # wait for project resources to be removed
+    while true; do
+        oc project blackduck-scan
+
+        if [ $? -ne 0 ]
+        then
+            echo "Delete completed."
+            # adm required to ignore quotas
+            oc adm new-project blackduck-scan
+            break			
+        fi
+        sleep 3
+    done
+}
+
+function usage() {
+
+  cat << EOF
+  Usage: install.sh <[options]>
+  Options:
+          --hubversion     (Required) The version of Black Duck Hub to operate with.  
+          --workers        (Optional) The quantity of concurrent scans per node. Default is 2
+          --insecuretls    (Optional) If present, relaxes TLS validation
+          --upgrade        (Optional) Upgrade existing installation if already installed
+
+  Environment variables required for non-interactive install:
+          BDS_HUB_SERVER   The fully qualified URL for the Black Duck Hub Server
+          BDS_HUB_USER     The user name to use for Hub operations
+          BDS_HUB_PASSWD   The password for the Hub user.
+
+  Environment variables required when installation occurs remote to the OpenShift Master
+          BDS_OCP_SERVER   The name of a master node of the OpenShift cluster
+          BDS_OCP_USER     The user name for a cluster admin on the cluster. Value isn't stored.
+          BDS_OCP_PASSWD   The password for a cluster admin on the cluster. Value isn't stored.
+
+EOF
+
+}
+
+
 #
 # URI parsing function
 # Source: http://wp.vpalos.com/537/uri-parsing-using-bash-built-in-features/
@@ -74,14 +157,30 @@ function uri_parser {
 }
 
 clear
-echo "============================================"
-echo "Black Duck Insight for OpenShift Installation"
-echo "============================================"
+echo "=============================================="
+echo "Black Duck OpsSight for OpenShift Installation"
+echo "=============================================="
+
+# Docker push will fail otherwise
+if [ $UID -ne 0 ]; then
+  echo -e "\nThis script must be run as root\n"
+  exit 1
+fi
+
+cmdOptions
 
 echo " "
-echo "============================================"
+echo "=============================================="
 echo "Black Duck Hub Configuration Information"
-echo "============================================"
+echo "=============================================="
+
+INTERACTIVE="false"
+
+if [ "$BDS_HUB_SERVER" == "" ]; then
+	INTERACTIVE="true"
+else
+	echo "Non-interactive installation requested"
+fi
 
 #set defaults
 DEF_WORKERS="2"
@@ -89,49 +188,72 @@ DEF_HUBUSER="sysadmin"
 DEF_OSSERVER=`hostname -f`
 DEF_OSSERVER="https://$DEF_OSSERVER:8443"
 DEF_MASTER=0
-
-read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
-
 allow_insecure="false"
 
-uri_parser "${huburl}" || { echo "Malformed Hub url!"; exit 1; }
+if [ "$INTERACTIVE" == "true" ]; then
 
-if [ "$uri_schema" == "https" ];
-then
-	echo "Do you wish to validate HTTPS certificates?"
-	select yn in "Yes" "No"; do
-    		case $yn in
-        		Yes ) allow_insecure="false"; break;;
-        		No ) allow_insecure="true"; break;;
-    		esac
+	tags=`curl --silent https://registry.hub.docker.com/v1/repositories/blackducksoftware/hub_ose_scanner/tags | sed -e 's/[][]//g' -e 's/"//g' -e 's/ //g' | tr '}' '\n'  | awk -F: '{print $3}' | tr '\n' ' '`
+	tags=`echo $tags Quit`
+	echo "Please select a supported Hub server version: "
+	tagOptions=($tags)
+	select supported_version in "${tagOptions[@]}"
+	do
+	    case $supported_version in
+        	"Quit")
+	            exit
+        	    ;;
+	        *) 
+			if [[ "$supported_version" != "" ]]; then
+    				echo "Installing version "$supported_version
+				break
+			fi;;
+	    esac
 	done
 
+	read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
+
+	uri_parser "${huburl}" || { echo "Malformed Hub server url!"; exit 1; }
+
+	if [ "$uri_schema" == "https" ]; then
+		echo "Do you wish to validate HTTPS certificates?"
+		select yn in "Yes" "No"; do
+    			case $yn in
+        			Yes ) allow_insecure="false"; break;;
+	        		No ) allow_insecure="true"; break;;
+    			esac
+		done
+	fi
+	read -p "Hub user name [$DEF_HUBUSER]: " hubuser
+	read -sp "Hub password: " hubpassword
+
+	echo " "
+	read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
+else
+
+
+	tags=`curl --silent https://registry.hub.docker.com/v1/repositories/blackducksoftware/hub_ose_scanner/tags | sed -e 's/[][]//g' -e 's/"//g' -e 's/ //g' | tr '}' '\n'  | awk -F: '{print $3}' | tr '\n' ' '`
+
+	if [[ "$tags" == *"$HUB_VERSION"* ]]; then
+	    supported_version=$HUB_VERSION
+	    echo "Installing version "$supported_version
+	else
+	    echo "'$HUB_VERSION' isn't supported. Exiting."
+	    exit
+	fi
+
+	huburl=$BDS_HUB_SERVER
+	hubuser=$BDS_HUB_USER
+	hubpassword=$BDS_HUB_PASSWD
+	workers=$WORKER_COUNT
+
+	uri_parser "${huburl}" || { echo "Malformed Hub server url: ${huburl}"; exit 1; }
+
+	if [ "$uri_schema" == "https" ]; then
+		if [ $INSECURE_TLS == 1 ]; then
+			allow_insecure="true"
+		fi
+	fi
 fi
-
-read -p "Hub user name [$DEF_HUBUSER]: " hubuser
-read -sp "Hub password: " hubpassword
-echo ""
-echo "Please select a supported Hub server version: "
-options=("3.6.2" "3.7.1" "Quit")
-select supported_version in "${options[@]}"
-do
-    case $supported_version in
-        "3.6.2")
-            break
-            ;;
-        "3.7.1")
-            break
-            ;;
-
-        "Quit")
-            exit
-            ;;
-        *) echo Invalid Hub version;;
-    esac
-done
-
-echo " "
-read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
 
 echo "============================================"
 echo "OpenShift Configuration"
@@ -141,7 +263,7 @@ echo " "
 # Are we running on a master node or not?
 if [ -e /etc/origin/master/master-config.yaml ]; then
     osserver=`grep masterPublicURL /etc/origin/master/master-config.yaml | egrep -o "https://.*[0-9]$" | head -n 1`
-    echo "Running on a Master --- Public URL: $osserver"
+    echo "Running on a Master --- public URL: $osserver"
 
     isclusteradmin=`oc describe clusterPolicyBindings | sed -n '/Role:[[:space:]]*cluster-admin/,/Groups:/p' | grep "Users:" | grep $(oc whoami) | wc -l`
     if [ $? -ne 0 ]
@@ -158,16 +280,23 @@ if [ -e /etc/origin/master/master-config.yaml ]; then
 	
     DEF_MASTER=1
 else
-    read -p "OpenShift Cluster [$DEF_OSSERVER]: " osserver
-    read -p "Cluster admin user name: " osuser
-    read -sp "Cluster admin password: " ospassword
 
-    oc login $osserver -u $osuser -p $ospassword
+	if [ "$INTERACTIVE" == "true" ]; then
+    		read -p "OpenShift Cluster [$DEF_OSSERVER]: " osserver
+    		read -p "Cluster admin user name: " osuser
+    		read -sp "Cluster admin password: " ospassword
+	else
+		osserver=$BDS_OCP_SERVER
+		osuser=$BDS_OCP_USER
+		ospassword=$BDS_OCP_PASSWD
+	fi
 
-    if [ $? -ne 0 ]
-    then
-         exit 1
-    fi
+    	oc login $osserver -u $osuser -p $ospassword
+
+    	if [ $? -ne 0 ]
+    	then
+        	exit 1
+    	fi
 fi
 
 echo " "
@@ -185,32 +314,22 @@ then
 	# adm required to ignore quotas
 	oc adm new-project blackduck-scan
 else
-	echo "Black Duck Insight scanner already installed. Do you wish to upgrade?"
-	select yn in "Yes" "No"; do
-    		case $yn in
-        		Yes ) echo "Upgrading existing installation at user request."
-				oc delete project blackduck-scan
-
-				echo "Wait for delete request to fully complete..."
-				sleep 5
-				
-				# wait for project resources to be removed
-				while true; do
-					oc project blackduck-scan
-
-					if [ $? -ne 0 ]
-					then
-						echo "Delete completed."
-						# adm required to ignore quotas
-						oc adm new-project blackduck-scan
-						break			
-					fi
-					sleep 3
-				done
-				break;;
-        		No ) echo "Aborting upgrade at user request."; exit 2; break;;
-    		esac
-	done
+	echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
+	if [ "$INTERACTIVE" == "true" ]; then
+		select yn in "Yes" "No"; do
+    			case $yn in
+        			Yes ) upgrade; break;;
+	        		No ) echo "Aborting upgrade at user request."; exit 2; break;;
+    			esac
+		done
+	else
+		if [ $UPGRADE == 1 ]; then
+			upgrade
+		else
+			echo "Aborting upgrade at user request."
+			exit 2
+		fi
+	fi
 
 fi
 
