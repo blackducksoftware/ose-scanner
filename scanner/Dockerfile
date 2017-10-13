@@ -1,7 +1,7 @@
 FROM centos:centos7
 MAINTAINER Black Duck Hub Team
 
-RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical --setopt=tsflags=nodocs && yum clean all
+RUN yum -y update-minimal --security --sec-severity=Important --sec-severity=Critical --setopt=tsflags=nodocs && yum clean all && chmod -x /bin/sh
 
 ARG bds_ver
 ARG LASTCOMMIT
@@ -24,20 +24,20 @@ COPY ./LICENSE /LICENSE
 COPY ./LICENSE /licenses/
 COPY ./help.1 /help.1
 
-LABEL name="Black Duck Insight for OpenShift Scanner" \
+LABEL name="Black Duck OpsSight for OpenShift Scanner" \
       vendor="Black Duck Software" \
       version="${bds_ver}" \
       release="1" \
-      summary="Black Duck Insight for OpenShift Scanner" \
-      description="Scan engine for Insight for OpenShift" \
+      summary="Black Duck OpsSight for OpenShift Scanner" \
+      description="Scan engine for OpsSight for OpenShift" \
       com.blackducksoftware.version="${bds_ver}" \
       com.blackducksoftware.product="Hub" \
       com.blackducksoftware.platform="OpenShift" \
       com.blackducksoftware.platform.version="${bds_ver}" \
-      com.blackducksoftware.platform.component="Insight for OpenShift Scanner" \ 
-      com.blackducksoftware.insight.lastcommit="$LASTCOMMIT" \
-      com.blackducksoftware.insight.buildtime="$BUILDTIME" \
-      com.blackducksoftware.insight.build="$BUILD"
+      com.blackducksoftware.platform.component="OpsSight for OpenShift Scanner" \ 
+      com.blackducksoftware.opssight.lastcommit="$LASTCOMMIT" \
+      com.blackducksoftware.opssight.buildtime="$BUILDTIME" \
+      com.blackducksoftware.opssight.build="$BUILD"
 
 ENTRYPOINT [ "/ose_scanner" ]
 EXPOSE 9036

@@ -15,20 +15,20 @@ COPY ./NOTICE /NOTICE
 COPY ./LICENSE /licenses/
 COPY ./help.1 /help.1
 
-LABEL name="Black Duck Insight for OpenShift Controller" \
+LABEL name="Black Duck OpsSight for OpenShift Controller" \
       vendor="Black Duck Software" \
       version="${bds_ver}" \
       release="1" \
-      summary="Black Duck Insight for OpenShift Controller" \
-      description="Scan controller for Insight for OpenShift" \
+      summary="Black Duck OpsSight for OpenShift Controller" \
+      description="Scan controller for OpsSight for OpenShift" \
       com.blackducksoftware.version="${bds_ver}" \
       com.blackducksoftware.product="Hub" \
       com.blackducksoftware.platform="OpenShift" \
       com.blackducksoftware.platform.version="${bds_ver}" \
-      com.blackducksoftware.platform.component="Insight for OpenShift Controller Service" \ 
-      com.blackducksoftware.insight.lastcommit="$LASTCOMMIT" \
-      com.blackducksoftware.insight.buildtime="$BUILDTIME" \
-      com.blackducksoftware.insight.build="$BUILD"
+      com.blackducksoftware.platform.component="OpsSight for OpenShift Controller Service" \ 
+      com.blackducksoftware.opssight.lastcommit="$LASTCOMMIT" \
+      com.blackducksoftware.opssight.buildtime="$BUILDTIME" \
+      com.blackducksoftware.opssight.build="$BUILD"
 
 # Clear any existing entry points
 ENTRYPOINT ["/ose_controller"]
