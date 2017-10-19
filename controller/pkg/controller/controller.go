@@ -138,7 +138,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 		c.queueImage(imageItem, Reference)
 
-	} else {
+	} else if ID != image.imageId {
 		log.Printf("Image %s already in image map with imageId %s but have imageId %s\n", Reference, image.imageId, ID)
 
 		validOriginal := image.exists()
