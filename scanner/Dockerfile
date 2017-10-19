@@ -17,7 +17,7 @@ ENV APP_HOME=/scan.cli-${bds_ver} \
 ENV PATH=${APP_HOME}/bin:${JAVA_HOME}/bin:${PATH}
 
 COPY ./output/ose_scanner /ose_scanner
-COPY ./hub_scanner/scan.cli/scan.cli-${bds_ver}-zip /scan.cli-${bds_ver}
+COPY ./hub_scanner/scan.cli/scan.cli-${bds_ver} /scan.cli-${bds_ver}
 COPY ./LICENSE /LICENSE
 
 # Container catalog requirements

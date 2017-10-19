@@ -14,6 +14,7 @@ all:
 
 	rm -Rf ./hub_scanner/scan.cli
 	unzip ./hub_scanner/scan.cli-$(BDS_SCANNER).zip -d ./hub_scanner/scan.cli
+	if [ -d ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER)-zip ]; then \cp -a ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER)-zip/. ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER); fi;
 	\cp ../LICENSE ./
 	
 	docker build --rm --build-arg bds_ver=$(BDS_SCANNER)  --build-arg "LASTCOMMIT=$(LAST_COMMIT)" --build-arg "BUILDTIME=$(BUILD_TIME)" --build-arg "BUILD=$(BUILD_TAG)" -t hub_ose_scanner:$(BDS_SCANNER) -f Dockerfile .
