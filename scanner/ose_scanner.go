@@ -36,6 +36,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -45,6 +47,10 @@ const (
 	BDS_SCANNER_BASE_DIR_VAR_NAME = "SCANNER_BASE_DIR"
 	SCAN_CLI_JAR_NAME_VAR_NAME    = "SCAN_CLI_JAR_NAME"
 	APP_HOME_VAR_NAME             = "APP_HOME"
+)
+
+var (
+	oseHttpEvents *prometheus.CounterVec
 )
 
 type input struct {
@@ -69,6 +75,13 @@ func init() {
 	flag.StringVar(&in.imageId, "id", "REQUIRED", "Image ID")
 	flag.StringVar(&in.taggedImage, "tag", "REQUIRED", "Tagged image name")
 	flag.StringVar(&in.digest, "digest", "REQUIRED", "Digest")
+	oseHttpEvents = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ose_scanner_http_events",
+		Help: "Catch all for http related events.",
+	},
+		[]string{"request_type"},
+	)
+	prometheus.MustRegister(oseHttpEvents)
 }
 
 // The flag package provides a default help printer via -h switch
@@ -155,7 +168,10 @@ func getHttpRequestResponse(client *httputil.ClientConn, httpMethod string, requ
 		return nil, err
 	}
 
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_DO_INIT"}).Inc()
 	resp, err = client.Do(req)
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_DO_RETURNED"}).Inc()
+
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +196,9 @@ func saveImageToTar(client *httputil.ClientConn, image string, path string) (tar
 
 	os.MkdirAll(path, 0755)
 	imageUrl := fmt.Sprintf("/images/%s/get", image)
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_INIT"}).Inc()
 	resp, err := getHttpRequestResponse(client, "GET", imageUrl)
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_RETURNED"}).Inc()
 
 	if err != nil {
 		return "", err
@@ -193,7 +211,9 @@ func saveImageToTar(client *httputil.ClientConn, image string, path string) (tar
 func imageExists(client *httputil.ClientConn, image string) (result bool, err error) {
 
 	imageUrl := fmt.Sprintf("/images/%s/history", image)
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_INIT_IMG"}).Inc()
 	resp, err := getHttpRequestResponse(client, "GET", imageUrl)
+	oseHttpEvents.With(prometheus.Labels{"request_type": "GET_INIT_IMG_RETURNED"}).Inc()
 
 	if err != nil {
 		log.Printf("Error testing for image presence\n%s\n", err.Error())
@@ -327,13 +347,14 @@ func validatePreCacheMode() {
 	val := os.Getenv("BDS_LISTEN")
 	if val != "9036" {
 		// flag wasn't set, so not in pre-cache mode
-		fmt.Println ("Precache flag missing. Configuring normal mode.")
+		fmt.Println("Precache flag missing. Configuring normal mode.")
 		return
 	}
 
-	fmt.Println ("Operating in pre-cache mode.")
+	fmt.Println("Operating in pre-cache mode.")
 
-	http.HandleFunc("/health", healthy)      // set router
+	http.HandleFunc("/health", healthy) // set router
+	http.Handle("/metrics", prometheus.Handler())
 	err := http.ListenAndServe(":9036", nil) // set listen port
 
 	if err != nil {
