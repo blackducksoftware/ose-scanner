@@ -3,16 +3,12 @@ BUILD_TIME := $(shell cat ../buildtime.txt)
 LAST_COMMIT := $(shell git rev-parse HEAD)
 
 all:
-	#clean up from the past
-	rm -Rf ./output \
-	mkdir output
-
-	rm -Rf ./build \
-	mkdir build
+	mkdir -p output build
 
 	GOOS=linux GOARCH=amd64 go build -o ./output/ose_scanner .
 
 	rm -Rf ./hub_scanner/scan.cli
+	curl -u "reader":"EGGlaptop4EGG_&" https://test-repo.blackducksoftware.com/artifactory/bds-hub-nightly/com/blackducksoftware/hub/scan.cli/${BDS_VER}/scan.cli-${BDS_VER}-zip.zip > ./hub_scanner/scan.cli-${BDS_VER}.zip
 	unzip ./hub_scanner/scan.cli-$(BDS_SCANNER).zip -d ./hub_scanner/scan.cli
 	if [ -d ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER)-zip ]; then \cp -a ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER)-zip/. ./hub_scanner/scan.cli/scan.cli-$(BDS_SCANNER); fi;
 	\cp ../LICENSE ./
@@ -23,5 +19,8 @@ all:
 	rm -Rf ./hub_scanner/scan.cli
 
 travis:
-	mkdir output
+	mkdir -p output
 	GOOS=linux GOARCH=amd64 go build -o ./output/ose_scanner .
+
+clean:
+	rm -Rf ./output ./build

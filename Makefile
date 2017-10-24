@@ -1,15 +1,20 @@
 BDS_VER ?= 3.6.2
 BUILD_NUMBER_FILE=build.txt
 
-all: clean build tar-install release-docker
+all: build tar-install release-docker
 
-tar-build: clean build tar-install
+tar-build: build tar-install
 
 clean: 
-	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
+	rm -Rf ./output/$(BDS_VER) buildtime.txt
+	cd ./scanner; make clean
+	cd ./controller; make clean
+	cd ./arbiter; make clean
 
 build:
+	mkdir -p ./output/$(BDS_VER)
 	$(eval OS_BUILD_NUMBER=$(shell cat $(BUILD_NUMBER_FILE)))
+	date +"%m-%d-%y" > buildtime.txt
 
 	cd ./scanner; make BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
 	cd ./controller; make BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
