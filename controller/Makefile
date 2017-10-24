@@ -4,12 +4,9 @@ BUILD_TIME := $(shell cat ../buildtime.txt)
 LAST_COMMIT := $(shell git rev-parse HEAD)
 
 all:
-	#clean up from the past
-	rm -Rf ./output \
-	mkdir output
+	mkdir -p output
 
-	#Assumes build on Cent/RHEL7.x
-	\cp /etc/ssl/certs/ca-bundle.crt ca-certificates.crt
+	docker run centos cat /etc/ssl/certs/ca-bundle.crt > ca-certificates.crt
 	\cp ../LICENSE ./
 
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-X main.bds_version=$(BDS_SCANNER) -X main.build_num=$(OCP_BUILD_NUMBER)" -o ./output/controller ./cmd/controller
@@ -22,5 +19,8 @@ vet:
 	go vet ${PKG_LIST}
 
 travis:
-	mkdir output
+	mkdir -p output
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-X main.bds_version=$(BDS_SCANNER) -X main.build_num=$(OCP_BUILD_NUMBER)" -o ./output/controller ./cmd/controller
+
+clean:
+	rm -Rf ./output ca-certificates.crt
