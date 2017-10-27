@@ -39,6 +39,8 @@ func ScanResults(info ImageInfo, taggedName string, imageId string, scanId strin
 		return errors.New("Invalid Hub credentials"), info
 	}
 
+	defer hub.Logout()
+
 	scanSummary, ok := hub.GetScanSummary(scanId)
 	if !ok {
 		e := fmt.Sprintf("ERROR no scan summary for image: %s", imageId)
@@ -152,6 +154,8 @@ func ValidateGetProjectVersion(projectVersionUrl string, hubConfig *HubConfig) b
 		log.Printf("Hub credentials not valid during project version check\n")
 		return false
 	}
+
+	defer hub.Logout()
 
 	_, ok := hub.GetProjectVersion(projectVersionUrl)
 	if !ok {

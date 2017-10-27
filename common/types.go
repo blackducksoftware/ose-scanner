@@ -30,6 +30,7 @@ import (
 type hubServer struct {
 	client *http.Client
 	config *HubConfig
+	loggedIn bool
 }
 
 type HubConfig struct {

@@ -254,6 +254,7 @@ func (c *Controller) getImages(done <-chan struct{}) {
 
 func (c *Controller) ValidateConfig() bool {
 	hubServer := bdscommon.NewHubServer(c.hubParams.Config)
+	defer hubServer.Logout()
 	return hubServer.Login()
 }
 
