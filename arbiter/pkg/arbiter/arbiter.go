@@ -228,6 +228,7 @@ func (arb *Arbiter) getImages(done <-chan struct{}) {
 // ValidateConfig validates if the Hub server configuration is valid. A login attempt will be performed.
 func (arb *Arbiter) ValidateConfig() bool {
 	hubServer := bdscommon.NewHubServer(Hub.Config)
+	defer hubServer.Logout()
 	return hubServer.Login()
 }
 

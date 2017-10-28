@@ -28,6 +28,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"crypto/tls"
 
@@ -234,6 +235,8 @@ func checkExpectedCmdlineParams() bool {
 
 	hub.Config.Wire = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify},
+		MaxIdleConns:       20,
+		IdleConnTimeout:    120 * time.Second, // we have various one minute timeouts in comms, so two should be best for an actual timeout
 	}
 
 	return true

@@ -13,7 +13,10 @@ All documentation, including compilation, installation and debugging instruction
 
 ## Release Status
 
-This project is under active development and has had no official releases. We welcome all contributions, and anyone attempting to use the code contained in here should expect rough edges and operational issues until release. If you identify an issue, please raise it, or better yet propose a solution.
+This project is under active development and has had one official releases. We welcome all contributions, and anyone attempting to use the code contained in here should expect some rough edges and operational issues until release. If you identify an issue, please raise it, or better yet propose a solution.
+
+### Contributing
+Note that contributions are best done via pull request. Its recommended to start small, and propose changes first. Raising an issue and holding discussion will help reduce the iterations during PR review.
 
 ## License
 

@@ -79,5 +79,7 @@ func (image ScanImage) versionResults(info bdscommon.ImageInfo) (error, bdscommo
 		return errors.New("Invalid Hub credentials"), info
 	}
 
+	defer hub.Logout()
+
 	return bdscommon.ProjectVersionResults(info, image.imageId, image.taggedName, image.sha, scanId, projectVersionUrl, hub, image.annotate)
 }

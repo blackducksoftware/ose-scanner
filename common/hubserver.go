@@ -52,11 +52,12 @@ func (p *myjar) Cookies(u *url.URL) []*http.Cookie {
 func NewHubServer(config *HubConfig) *hubServer {
 
 	return &hubServer{
-		&http.Client{
+		client: &http.Client{
 			Timeout:   hangtimeBeforeTimingOutOnTheHub,
 			Transport: config.Wire,
 		},
-		config,
+		config: config,
+		loggedIn: false,
 	}
 }
 
@@ -103,8 +104,39 @@ func (h *hubServer) Login() bool {
 		log.Printf("ERROR: resp status: %s (%d)\n", resp.Status, resp.StatusCode)
 		return false
 	}
+	h.loggedIn = true
 	return true
 }
+
+func (h *hubServer) Logout() bool {
+	// check if the Config entry is initialized
+	if h.config == nil {
+		log.Printf("ERROR in hubServer no configuration available.\n")
+		return false
+	}
+
+	log.Printf("Logout attempt on %s when logged in is %v\n", h.config.Url, h.loggedIn)
+	u, err := url.ParseRequestURI(h.config.Url)
+	if err != nil {
+		log.Printf("ERROR : url.ParseRequestURI: %s\n", err)
+		return false
+	}
+
+	resource := "/j_spring_security_logout"
+	u.Path = resource
+
+	urlStr := fmt.Sprintf("%v", u)
+
+	resp, err := h.client.Get(urlStr)
+
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		log.Printf("ERROR: resp status: %s (%d)\n", resp.Status, resp.StatusCode)
+		return false
+	}
+	return true
+}
+
 
 func (h *hubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 
@@ -284,6 +316,9 @@ func (h *hubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer
 		log.Printf("ERROR in client.url : %s get: %s\n", restEndPointUrl, err)
 		return buf
 	}
+
+	defer resp.Body.Close()
+
 	log.Printf("Endpoint status %s\n", resp.Status)
 
 	if resp.StatusCode != 200 {
@@ -295,7 +330,6 @@ func (h *hubServer) getHubRestEndPointJson(restEndPointUrl string) *bytes.Buffer
 		log.Printf("ERROR reading from response: %s url: %s\n", err, restEndPointUrl)
 		return buf
 	}
-	defer resp.Body.Close()
 
 	return buf
 }
