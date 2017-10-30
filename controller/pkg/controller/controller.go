@@ -132,8 +132,9 @@ func (c *Controller) AddImage(ID string, Reference string) {
 
 		imageItem := newScanImage(ID, Reference, c.annotation, c.hubParams.Config, c.hubParams.Scanner)
 
-		if !imageItem.exists() {
-			log.Printf("Image %s:%s not present in node. Not adding to image map.\n", imageItem.digest, imageItem.imageId)
+		if imageItem == nil {
+			log.Printf("Image %s:%s not present in node. Not adding to image map.\n", Reference, ID)
+			return
 		}
 
 		c.queueImage(imageItem, Reference)
@@ -150,9 +151,9 @@ func (c *Controller) AddImage(ID string, Reference string) {
 		}
 
 		newImage := newScanImage(ID, Reference, c.annotation, c.hubParams.Config, c.hubParams.Scanner)
-		validUpdate := newImage.exists()
-		if !validUpdate {
-			log.Printf("Requested imageId %s does not exist on this node. Skipping.\n", image.imageId)
+
+		if newImage == nil {
+			log.Printf("Requested imageId %s does not exist on this node. Skipping.\n", Reference)
 			return
 		} else if validOriginal {
 			// we have both an original and an update which is valid
@@ -160,7 +161,7 @@ func (c *Controller) AddImage(ID string, Reference string) {
 				// since we see the original, and its been scanned, and it has the same pullspec, then we replace it and refresh
 				log.Printf("Replacing queued and scanned imageId %s with %s for image %s\n", image.imageId, newImage.imageId, Reference)
 				c.queueImage(newImage, Reference)
-			} else {
+			} else if image.imageId != newImage.imageId {
 				/*
 				* in this case we have both a unscanned original and an unscanned update
 				* not quite certain what to do here just yet TODO
