@@ -28,8 +28,8 @@ import (
 )
 
 type hubServer struct {
-	client *http.Client
-	config *HubConfig
+	client   *http.Client
+	config   *HubConfig
 	loggedIn bool
 }
 

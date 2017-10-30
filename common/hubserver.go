@@ -56,7 +56,7 @@ func NewHubServer(config *HubConfig) *hubServer {
 			Timeout:   hangtimeBeforeTimingOutOnTheHub,
 			Transport: config.Wire,
 		},
-		config: config,
+		config:   config,
 		loggedIn: false,
 	}
 }
@@ -136,7 +136,6 @@ func (h *hubServer) Logout() bool {
 	}
 	return true
 }
-
 
 func (h *hubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 

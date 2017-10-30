@@ -119,6 +119,8 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 
 	digest := is.Spec.DockerImageRepository
 
+	log.Printf("ImageStream created: %s\n", digest)
+
 	for _, events := range tags {
 		tagEvents := events.Items
 		if len(tagEvents) == 0 {
@@ -187,7 +189,7 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 func (w *Watcher) PodCreated(pod *kapi.Pod) {
 	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
 
-	if pod.Status.Phase != kapi.PodRunning {
+	if !(pod.Status.Phase == kapi.PodPending || pod.Status.Phase == kapi.PodRunning) {
 		log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
 		return
 	}

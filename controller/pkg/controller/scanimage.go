@@ -40,6 +40,7 @@ type ScanImage struct {
 	annotate   *bdscommon.Annotator
 	config     *bdscommon.HubConfig
 	scanner    string
+	engineId   string
 }
 
 func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator, config *bdscommon.HubConfig, scanner string) *ScanImage {
@@ -48,7 +49,7 @@ func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator, co
 
 	Ids := strings.Split(ID, "sha256:")
 
-	return &ScanImage{
+	image := &ScanImage{
 		imageId:    Ids[len(Ids)-1],
 		taggedName: tag[0],
 		sha:        tag[1],
@@ -58,6 +59,12 @@ func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator, co
 		config:     config,
 		scanner:    scanner,
 	}
+
+	if !image.validate() {
+		return nil
+	}
+
+	return image
 }
 
 func (image ScanImage) getArgs() []string {
@@ -85,7 +92,7 @@ func (image ScanImage) getArgs() []string {
 	args = append(args, image.config.Insecure)
 
 	args = append(args, "-id")
-	args = append(args, image.imageId)
+	args = append(args, image.engineId)
 
 	args = append(args, "-tag")
 	args = append(args, image.taggedName)
@@ -97,11 +104,10 @@ func (image ScanImage) getArgs() []string {
 
 }
 
-// scan queues a request for scanning.
-// TODO Rename this to "addScanToQueue".
+// launches a scanner container to perform the scan
 func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
 
-	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.imageId[:10])
+	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.engineId[:10])
 
 	docker := NewDocker()
 	if docker.client == nil {
@@ -109,10 +115,8 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 		return errors.New("Invalid Docker connection"), info
 	}
 
-	//if !docker.imageExists(image.digest) {
-
-	if !docker.imageExists(image.imageId) {
-		log.Printf("Image %s does not exist\n", image.digest)
+	if !docker.imageExists(image.engineId) {
+		log.Printf("Image %s:%s does not exist\n", image.digest, image.engineId)
 		return errors.New("Image does not exist"), info
 	}
 
@@ -125,7 +129,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 		return err, info
 	}
 
-	log.Printf("Done Scanning: %s (%s) with result %t using scanId %s\n", image.taggedName, image.imageId[:10], goodScan.completed, goodScan.scanId)
+	log.Printf("Done Scanning: %s (%s) with result %t using scanId %s\n", image.taggedName, image.engineId[:10], goodScan.completed, goodScan.scanId)
 
 	image.scanned = true
 	image.scanId = goodScan.scanId
@@ -142,7 +146,43 @@ func (image ScanImage) results(info bdscommon.ImageInfo) (error, bdscommon.Image
 	return bdscommon.ScanResults(info, image.taggedName, image.imageId, image.scanId, image.sha, image.annotate, image.config)
 }
 
-func (image ScanImage) exists() bool {
+func (image *ScanImage) validate() bool {
+
+	log.Printf("Validating image: %s\n", image.digest)
+
+	docker := NewDocker()
+	if docker.client == nil {
+		log.Printf("No Docker client connection\n")
+		return false
+	}
+
+	if docker.imageExists(image.imageId) {
+		log.Printf("Validated image %s in local engine", image.imageId)
+		image.engineId = image.imageId
+		return true
+	}
+
+	imageId, found := docker.imageFromSpec(image.digest)
+	if found {
+		log.Printf("Validated image %s in local engine for digest %s", imageId, image.digest)
+		image.engineId = imageId
+		return true
+	}
+
+	imageId, found = docker.imageFromSpec(image.taggedName)
+	if found {
+		log.Printf("Validated image %s in local engine for tagged image %s", imageId, image.taggedName)
+		image.engineId = imageId
+		return true
+	}
+
+	log.Printf("Image %s not found in local docker engine\n", image.digest)
+
+	return false
+
+}
+
+func (image *ScanImage) exists() bool {
 
 	log.Printf("Testing for image: %s (%s)\n", image.taggedName, image.imageId[:10])
 
@@ -152,10 +192,20 @@ func (image ScanImage) exists() bool {
 		return false
 	}
 
-	//if !docker.imageExists(image.digest) {
-
 	if !docker.imageExists(image.imageId) {
-		log.Printf("Image %s:%s does not exist\n", image.digest, image.imageId)
+		// the image ID might be messed up in some fashion
+		/*
+			log.Printf("Image ID %s missing. Testing from digest of %s", image.imageId, image.digest)
+			imageId, found := docker.imageFromSpec (image.digest)
+			if found {
+				log.Printf ("Image ID %s associated with %s was found as ID %s. Replacing.", image.imageId, image.digest, imageId)
+				image.imageId = imageId
+				return true
+
+			}
+		*/
+
+		log.Printf("Image %s:%s does not exist in local engine\n", image.digest, image.imageId)
 		return false
 	}
 

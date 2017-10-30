@@ -67,7 +67,7 @@ func init() {
 	flag.StringVar(&in.scheme, "s", "REQUIRED", "The communication scheme [http,https].")
 	flag.StringVar(&in.username, "u", "REQUIRED", "The Black Duck Hub user")
 	flag.StringVar(&in.password, "w", "REQUIRED", "Password for the user. You're not prompted since this is automated run.")
-	flag.StringVar(&in.imageId, "id", "REQUIRED", "Image ID")
+	flag.StringVar(&in.imageId, "id", "REQUIRED", "Engine query image ID")
 	flag.StringVar(&in.insecure, "insecure", "OPTIONAL", "Should insecure TLS be used")
 	flag.StringVar(&in.taggedImage, "tag", "REQUIRED", "Tagged image name")
 	flag.StringVar(&in.digest, "digest", "REQUIRED", "Digest")
@@ -398,9 +398,9 @@ func main() {
 
 	image := in.imageId
 	digest := in.digest
-	log.Printf("Processing digest: %s\n", digest)
+	log.Printf("Processing image: %s with engine ID %s\n", digest, image)
 	// save image
-	img_dir_name := strings.Replace(image, ":", "_", -1)
+	img_dir_name := strings.Replace(digest, ":", "_", -1)
 	img_dir_name = strings.Replace(img_dir_name, "/", "_", -1)
 
 	codeLocation := "/bdsocp/"
