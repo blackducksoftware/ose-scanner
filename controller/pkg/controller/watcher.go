@@ -76,9 +76,7 @@ func (w *Watcher) Run() {
 			AddFunc: func(obj interface{}) {
 				w.ImageAdded(obj.(*imageapi.ImageStream))
 			},
-			UpdateFunc: func(old, obj interface{}) {
-				w.ImageUpdated(obj.(*imageapi.ImageStream))
-			},
+
 			DeleteFunc: func(obj interface{}) {
 				w.ImageDeleted(obj.(*imageapi.ImageStream))
 			},
@@ -137,6 +135,10 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 	}
 }
 
+// care should be used with updates. Per kube docs:
+//    OnUpdate is also called when a re-list happens, and it will
+//      get called even if nothing changed. This is useful for periodically
+//      evaluating or syncing something.
 func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 
 	tags := is.Status.Tags
@@ -146,6 +148,8 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 	}
 
 	digest := is.Spec.DockerImageRepository
+
+	log.Printf("ImageStream updated: %s\n", digest)
 
 	for _, events := range tags {
 		tagEvents := events.Items
