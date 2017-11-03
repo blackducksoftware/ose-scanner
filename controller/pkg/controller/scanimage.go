@@ -105,19 +105,19 @@ func (image ScanImage) getArgs() []string {
 }
 
 // launches a scanner container to perform the scan
-func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
+func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo, bool) {
 
 	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.engineId[:10])
 
 	docker := NewDocker()
 	if docker.client == nil {
 		log.Printf("No Docker client connection\n")
-		return errors.New("Invalid Docker connection"), info
+		return errors.New("Invalid Docker connection"), info, false
 	}
 
 	if !docker.imageExists(image.engineId) {
 		log.Printf("Image %s:%s does not exist\n", image.digest, image.engineId)
-		return errors.New("Image does not exist"), info
+		return errors.New("Image does not exist"), info, false
 	}
 
 	args := image.getArgs()
@@ -126,7 +126,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 
 	if err != nil {
 		log.Printf("Error creating scanning container: %s\n", err)
-		return err, info
+		return err, info, false
 	}
 
 	log.Printf("Done Scanning: %s (%s) with result %t using scanId %s\n", image.taggedName, image.engineId[:10], goodScan.completed, goodScan.scanId)
@@ -135,10 +135,11 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 	image.scanId = goodScan.scanId
 
 	if goodScan.completed {
-		return image.results(info)
+		err, updatedInfo := image.results(info)
+		return err, updatedInfo, goodScan.completed
 	}
 
-	return nil, info
+	return nil, info, goodScan.completed
 
 }
 
