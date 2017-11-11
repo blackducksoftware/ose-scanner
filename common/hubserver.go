@@ -128,6 +128,10 @@ func (h *hubServer) Logout() bool {
 	urlStr := fmt.Sprintf("%v", u)
 
 	resp, err := h.client.Get(urlStr)
+	if err != nil {
+		log.Printf("ERROR client.Get %s\n", err)
+		return false
+	}
 
 	resp.Body.Close()
 	if resp.StatusCode != 204 {
