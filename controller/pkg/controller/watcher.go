@@ -59,32 +59,34 @@ func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
 
 func (w *Watcher) Run() {
 
-	log.Println("Subscribing to image stream events ....")
+	if w.openshiftClient != nil {
+		log.Println("Subscribing to image stream events ....")
 
-	_, k8sCtl := framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
-				return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
+		_, k8sCtl := framework.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
+					return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
+				},
+				WatchFunc: func(opts kapi.ListOptions) (watch.Interface, error) {
+					return w.openshiftClient.ImageStreams(w.Namespace).Watch(opts)
+				},
 			},
-			WatchFunc: func(opts kapi.ListOptions) (watch.Interface, error) {
-				return w.openshiftClient.ImageStreams(w.Namespace).Watch(opts)
-			},
-		},
-		&imageapi.ImageStream{},
-		time.Minute,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				w.ImageAdded(obj.(*imageapi.ImageStream))
-			},
+			&imageapi.ImageStream{},
+			time.Minute,
+			framework.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					w.ImageAdded(obj.(*imageapi.ImageStream))
+				},
 
-			DeleteFunc: func(obj interface{}) {
-				w.ImageDeleted(obj.(*imageapi.ImageStream))
-			},
-		})
+				DeleteFunc: func(obj interface{}) {
+					w.ImageDeleted(obj.(*imageapi.ImageStream))
+				},
+			})
 
-	log.Println("Watching image streams....")
+		log.Println("Watching image streams....")
 
-	go k8sCtl.Run(wait.NeverStop)
+		go k8sCtl.Run(wait.NeverStop)
+	}
 
 	log.Println("Subscribing to pod events ....")
 
@@ -191,28 +193,19 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 }
 
 func (w *Watcher) PodCreated(pod *kapi.Pod) {
-	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
+	log.Printf("Pod creation for %s in namespace %s \n", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
 
-	if !(pod.Status.Phase == kapi.PodPending || pod.Status.Phase == kapi.PodRunning) {
+	if pod.Status.Phase == kapi.PodPending {
+		// defer processing until its running
+		go w.controller.waitPodRunning(pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+		return
+	}
+
+	if pod.Status.Phase != kapi.PodRunning {
 		log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
 		return
 	}
 
-	d := NewDocker()
+	w.controller.processPod(pod)
 
-	for _, container := range pod.Spec.Containers {
-		log.Printf("\tPod container %s with image %s on pod %s\n", container.Name, container.Image, pod.ObjectMeta.Name)
-
-		digests, imageId, found := d.digestFromImage(container.Image)
-
-		if !found {
-			log.Printf("\tPod image %s not found\n", container.Image)
-			continue
-		}
-
-		for _, digest := range digests {
-			log.Printf("\tFound pod image %s: %s\n", imageId, digest)
-			w.controller.AddImage(imageId, digest)
-		}
-	}
 }

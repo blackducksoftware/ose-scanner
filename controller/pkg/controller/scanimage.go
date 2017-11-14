@@ -104,20 +104,25 @@ func (image ScanImage) getArgs() []string {
 
 }
 
-// launches a scanner container to perform the scan
-func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo, bool) {
+// scan launches a scanner container to perform the scan
+func (image ScanImage) scan() (error, bdscommon.ImageInfo, bool) {
+
+	emptyInfo := bdscommon.ImageInfo{
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+	}
 
 	log.Printf("Scanning: %s (%s)\n", image.taggedName, image.engineId[:10])
 
 	docker := NewDocker()
 	if docker.client == nil {
 		log.Printf("No Docker client connection\n")
-		return errors.New("Invalid Docker connection"), info, false
+		return errors.New("Invalid Docker connection"), emptyInfo, false
 	}
 
 	if !docker.imageExists(image.engineId) {
 		log.Printf("Image %s:%s does not exist\n", image.digest, image.engineId)
-		return errors.New("Image does not exist"), info, false
+		return errors.New("Image does not exist"), emptyInfo, false
 	}
 
 	args := image.getArgs()
@@ -126,7 +131,7 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 
 	if err != nil {
 		log.Printf("Error creating scanning container: %s\n", err)
-		return err, info, false
+		return err, emptyInfo, false
 	}
 
 	log.Printf("Done Scanning: %s (%s) with result %t using scanId %s\n", image.taggedName, image.engineId[:10], goodScan.completed, goodScan.scanId)
@@ -135,16 +140,16 @@ func (image ScanImage) scan(info bdscommon.ImageInfo) (error, bdscommon.ImageInf
 	image.scanId = goodScan.scanId
 
 	if goodScan.completed {
-		err, updatedInfo := image.results(info)
+		err, updatedInfo := image.results()
 		return err, updatedInfo, goodScan.completed
 	}
 
-	return nil, info, goodScan.completed
+	return nil, emptyInfo, false
 
 }
 
-func (image ScanImage) results(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
-	return bdscommon.ScanResults(info, image.taggedName, image.imageId, image.scanId, image.sha, image.annotate, image.config)
+func (image ScanImage) results() (error, bdscommon.ImageInfo) {
+	return bdscommon.ScanResults(image.taggedName, image.imageId, image.scanId, image.sha, image.annotate, image.config)
 }
 
 func (image *ScanImage) validate() bool {

@@ -49,6 +49,7 @@ func (p *myjar) Cookies(u *url.URL) []*http.Cookie {
 	return p.jar[u.Host]
 }
 
+// NewHubServer creates a new connection to a Hub server
 func NewHubServer(config *HubConfig) *hubServer {
 
 	return &hubServer{
@@ -61,6 +62,7 @@ func NewHubServer(config *HubConfig) *hubServer {
 	}
 }
 
+// Login performs a login to the hub server. Note an explicit logout is required.
 func (h *hubServer) Login() bool {
 	// check if the Config entry is initialized
 	if h.config == nil {
@@ -108,6 +110,7 @@ func (h *hubServer) Login() bool {
 	return true
 }
 
+// Logout logs the user out of the hub server
 func (h *hubServer) Logout() bool {
 	// check if the Config entry is initialized
 	if h.config == nil {
@@ -141,6 +144,7 @@ func (h *hubServer) Logout() bool {
 	return true
 }
 
+// GetCodeLocation takes a fully qualified apiUrl to a Code Location (aka scan record) and returns the result
 func (h *hubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 
 	log.Println(apiUrl)
@@ -160,6 +164,7 @@ func (h *hubServer) GetCodeLocation(apiUrl string) (*CodeLocationStruct, bool) {
 	return &codeLocation, true
 }
 
+// FindCodeLocations takes a search condition and finds the corresponding code location (aka scan record)
 func (h *hubServer) FindCodeLocations(searchCriterea string) *CodeLocationsStruct {
 	searchStr := url.QueryEscape(searchCriterea)
 	getStr := fmt.Sprintf("%s/api/codelocations/?q=%s&limit=5000", h.config.Url, searchStr)
@@ -178,6 +183,7 @@ func (h *hubServer) FindCodeLocations(searchCriterea string) *CodeLocationsStruc
 	return &codeLocations
 }
 
+// FindCodeLocationScanSummaries takes an API url and returns code location (aka scan record) summary
 func (h *hubServer) FindCodeLocationScanSummaries(url string) *codeLocationsScanSummariesStruct {
 
 	log.Println(url)
@@ -195,6 +201,7 @@ func (h *hubServer) FindCodeLocationScanSummaries(url string) *codeLocationsScan
 	return &codeLocationsScanSummaries
 }
 
+// GetScanSummary takes a scanID and returns a scan summary
 func (h *hubServer) GetScanSummary(scanId string) (*ScanSummaryStruct, bool) {
 	apiUrl := fmt.Sprintf("%s/api/scan-summaries/%s", h.config.Url, scanId)
 
@@ -216,6 +223,7 @@ func (h *hubServer) GetScanSummary(scanId string) (*ScanSummaryStruct, bool) {
 	return &scanSummary, true
 }
 
+// FindProjects takes a project name and returns a project summary
 func (h *hubServer) FindProjects(projectName string) *projectsStruct {
 	searchCriterea := "name:" + projectName
 	searchStr := url.QueryEscape(searchCriterea)
@@ -235,6 +243,7 @@ func (h *hubServer) FindProjects(projectName string) *projectsStruct {
 	return &projects
 }
 
+// GetProjectVersion takes an api project reference and returns a project version
 func (h *hubServer) GetProjectVersion(apiUrl string) (*projectVersionStruct, bool) {
 
 	log.Println(apiUrl)
@@ -254,6 +263,7 @@ func (h *hubServer) GetProjectVersion(apiUrl string) (*projectVersionStruct, boo
 	return &projectVersion, true
 }
 
+// FindProjectVersions takes a project ID and a search query for a version and returns a Hub record for the projectVersion
 func (h *hubServer) FindProjectVersions(projectId string, projectVersion string) *projectVersionsStruct {
 	searchCriterea := "versionName:" + projectVersion
 	searchStr := url.QueryEscape(searchCriterea)
@@ -273,6 +283,7 @@ func (h *hubServer) FindProjectVersions(projectId string, projectVersion string)
 	return &projectVersions
 }
 
+// GetRiskProfile takes an API endpoint and returns a risk profile for the project version
 func (h *hubServer) GetRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
 
 	log.Println(apiUrl)
@@ -292,6 +303,7 @@ func (h *hubServer) GetRiskProfile(apiUrl string) (*riskProfileStruct, bool) {
 	return &riskProfile, true
 }
 
+// GetPolicyStatus takes an API endpint for a project version and returns policy information
 func (h *hubServer) GetPolicyStatus(apiUrl string) (*policyStatusStruct, bool) {
 
 	log.Println(apiUrl)

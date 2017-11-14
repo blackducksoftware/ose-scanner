@@ -117,28 +117,25 @@ func (w Worker) RequestScanAuthorization(job Job) {
 			continue
 		}
 
-		ok, info := job.GetAnnotationInfo()
-		if !ok {
-			log.Printf("Error getting annotation info for image: %s", image.digest)
-		}
-
 		log.Printf("Starting scan of %s with arbiter hash of %s\n", image.digest, requestHash)
 
-		err, results, completed := image.scan(info)
+		err, results, completed := image.scan()
 
 		if err != nil {
 			log.Printf("Scan image error for %s of %s\n", image.digest, err)
 			w.arbiter.abortScan(requestHash) // abort will return the item to the arbiter queue, but remove it from ours
 			break
 		}
-		if completed && ok && err == nil {
-			ok = job.UpdateAnnotationInfo(results)
-			if ok {
-				log.Printf("Updated annotation info for image: %s", image.digest)
-			}
-		}
 
 		if completed {
+			ok := job.UpdateImageAnnotationInfo(results)
+			if ok {
+				log.Printf("Updated annotation info for image: %s\n", image.digest)
+			}
+			ok = job.ApplyAnnotationInfoToPods(image.digest, results)
+			if ok {
+				log.Printf("Applied annotation info for pod set.\n")
+			}
 			w.arbiter.scanDone(requestHash)
 		} else {
 			w.arbiter.abortScan(requestHash)
