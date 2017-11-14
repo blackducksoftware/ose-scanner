@@ -31,7 +31,7 @@ function cmdOptions() {
 
             --usage) usage; exit 1 ;;
 
-		
+
         esac
       done
 
@@ -53,7 +53,7 @@ function upgrade() {
             echo "Delete completed."
             # adm required to ignore quotas
             oc adm new-project blackduck-scan
-            break			
+            break
         fi
         sleep 3
     done
@@ -203,7 +203,7 @@ if [ "$INTERACTIVE" == "true" ]; then
 	echo " "
 	read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
 else
-	
+
 	huburl=$BDS_HUB_SERVER
 	hubuser=$BDS_HUB_USER
 	hubpassword=$BDS_HUB_PASSWD
@@ -235,7 +235,7 @@ if [ -e /etc/origin/master/master-config.yaml ]; then
          echo "User does not have required cluster-admin rights."
          exit 1
     fi
-	
+
     DEF_MASTER=1
 else
 
@@ -278,7 +278,7 @@ then
 	# adm required to ignore quotas
 	oc adm new-project blackduck-scan
 else
-	
+
 	if [ "$INTERACTIVE" == "true" ]; then
 		echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
 		select yn in "Yes" "No"; do
@@ -343,9 +343,9 @@ then
 		# Fixed issue if docker registry has Containered Gluster
 		dockerip=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 2`
 		dockerport=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 4 | cut -d '/' -f 1`
-		
+
 		docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
-		
+
 		if [ $? -ne 0 ]
 		then
 			echo "Please validate the docker configuration"
@@ -358,9 +358,20 @@ oc project blackduck-scan
 
 echo "Loading images into Docker engine. This may take a few minutes..."
 
-docker load < hub_ose_controller.tar
-docker load < hub_ose_scanner.tar
-docker load < hub_ose_arbiter.tar
+# For lean releases that are idiomatic to the hub + automated testing, having a separate registry is desirebale.
+function internalize_containers {
+  if [[ -z $SCANNER_REGISTRY ]] && [[ -z $SCANNER_VERSION ]]; then
+    docker pull $SCANNER_REGISTRY/hub_ose_arbiter:$SCANNER_VERSION
+    docker pull $SCANNER_REGISTRY/hub_ose_controller:$SCANNER_VERSION
+    docker pull $SCANNER_REGISTRY/hub_ose_scanner:$SCANNER_VERSION ;
+  # Legacy installation method.  We don't want to ship tarballs to customers.  We would rather
+  # whitelist a secure docker registry on blackducksoftware.com if need be.
+  else
+    docker load < hub_ose_controller.tar
+    docker load < hub_ose_scanner.tar
+    docker load < hub_ose_arbiter.tar
+  fi
+}
 
 version=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 2 `
 #controllerimageid=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 3 `
@@ -459,7 +470,7 @@ fi
 rm ${podfile}
 
 #
-# Create Service 
+# Create Service
 #
 
 podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
@@ -475,11 +486,10 @@ if [ ! -z "`oc get svc | grep scan-arbiter`" ];
 then
 	oc delete svc scan-arbiter
 fi
-	
+
 oc create -f ${podfile}
 
 
 rm ${podfile}
 
 echo "Installation complete. Validate pod execution from within OpenShift."
-
