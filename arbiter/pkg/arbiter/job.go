@@ -23,29 +23,60 @@ under the License.
 package arbiter
 
 import (
+	"encoding/json"
+
 	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+	kapi "k8s.io/kubernetes/pkg/api"
 	"log"
 	"time"
 )
 
+// Job represents a scan activity
 type Job struct {
 	ScanImage *ScanImage
+	PodImage  *PodImage
 	arbiter   *Arbiter
 }
 
+// Spec is a metadata primative for k8s annotations
+type Spec struct {
+	Metadata bdscommon.ImageInfo `json:"metadata"`
+}
+
+func newJob(scanImage *ScanImage, podImage *PodImage, arb *Arbiter) *Job {
+	return &Job{
+		ScanImage: scanImage,
+		arbiter:   arb,
+		PodImage:  podImage,
+	}
+}
+
+// Done completes processing on the job
 func (job Job) Done(result bool) {
-	job.arbiter.Done(result, job.ScanImage.digest)
+	if job.ScanImage != nil {
+		job.arbiter.DoneScan(result, job.ScanImage.digest)
+	} else if job.PodImage != nil {
+		job.arbiter.DonePod(job.PodImage.imageName)
+	}
+
 	time.Sleep(100 * time.Millisecond) // allow API server some time to breathe
 	return
 }
 
+// Load adds a job to the queue
 func (job Job) Load() {
 	job.arbiter.Add()
-	log.Println("Queue image: " + job.ScanImage.taggedName)
 	return
 }
 
-func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
+// GetImageAnnotationInfo gets the current annotation set for the job's image
+func (job Job) GetImageAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
+
+	if job.arbiter.openshiftClient == nil {
+		// if there's no OpenShift client, there can't be any image annotations
+		return false, info
+	}
+
 	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
@@ -66,16 +97,23 @@ func (job Job) GetAnnotationInfo() (result bool, info bdscommon.ImageInfo) {
 	return true, info
 }
 
-func (job Job) UpdateAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
+// UpdateImageAnnotationInfo applies a merged set of annoations to the specified image
+func (job Job) UpdateImageAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
+
+	if job.arbiter.openshiftClient == nil {
+		// if there's no OpenShift client, there can't be any image annotations
+		return false
+	}
+
 	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false
 	}
 
-	_, oldInfo := job.GetAnnotationInfo()
+	_, oldInfo := job.GetImageAnnotationInfo()
 
-	results := job.MergeAnnotationResults(oldInfo, newInfo)
+	results := job.mergeAnnotationResults(oldInfo, newInfo)
 
 	image.ObjectMeta.Annotations = results.Annotations
 
@@ -90,7 +128,72 @@ func (job Job) UpdateAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
 	return true
 }
 
-func (job Job) MergeAnnotationResults(oldInfo bdscommon.ImageInfo, newInfo bdscommon.ImageInfo) bdscommon.ImageInfo {
+func (job Job) getPodAnnotationInfo(pod *kapi.Pod, podName string) (info bdscommon.ImageInfo) {
+
+	info.Annotations = pod.ObjectMeta.Annotations
+	if info.Annotations == nil {
+		log.Printf("Pod %s has no annotations - creating object.\n", podName)
+		info.Annotations = make(map[string]string)
+	}
+	info.Labels = pod.ObjectMeta.Labels
+	if info.Labels == nil {
+		log.Printf("Pod %s has no labels - creating object.\n", podName)
+		info.Labels = make(map[string]string)
+	}
+	return info
+}
+
+// UpdatePodAnnotationInfo updates an existing pod annotations/lables with our scna results
+func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo bdscommon.ImageInfo) bool {
+
+	if job.arbiter.kubeClient == nil {
+		// k8s client should always be present, but safe trumps sorry
+		return false
+	}
+
+	spec := &Spec{}
+
+	spec.Metadata.Annotations = newInfo.Annotations
+	spec.Metadata.Labels = newInfo.Labels
+
+	patch, err := json.Marshal(spec)
+	if err != nil {
+		log.Printf("Job: Error marshalling spec for pod %s: %s\n", podName, err)
+		return false
+	}
+	patchBytes := []byte(patch)
+
+	_, err = job.arbiter.kubeClient.RESTClient.Patch(kapi.StrategicMergePatchType).
+		NamespaceIfScoped(namespace, true).
+		Resource("pods").
+		Name(podName).
+		Body(patchBytes).
+		Do().
+		Get()
+
+	if err != nil {
+		log.Printf("Error updating annotations for pod: %s in namespace %s. %s\n", podName, namespace, err)
+		return false
+	}
+
+	return true
+}
+
+// ApplyAnnotationInfoToPods iterates the list of pods where the image is used and applies optimistic annotations
+func (job Job) ApplyAnnotationInfoToPods(newInfo bdscommon.ImageInfo) bool {
+
+	image := job.PodImage.imageName
+	for _, podInfo := range job.arbiter.imageUsage[image] {
+		ok := job.UpdatePodAnnotationInfo(podInfo.namespace, podInfo.name, newInfo)
+		if !ok {
+			log.Printf("Unable to annotate pods for image %s\n", image)
+			return false
+		}
+	}
+	return true
+}
+
+func (job Job) mergeAnnotationResults(oldInfo bdscommon.ImageInfo, newInfo bdscommon.ImageInfo) bdscommon.ImageInfo {
 
 	for k, v := range newInfo.Labels {
 		oldInfo.Labels[k] = v

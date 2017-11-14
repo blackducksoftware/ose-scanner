@@ -74,10 +74,10 @@ func main() {
 		log.Printf("Error creating cluster config: %s", err)
 		os.Exit(1)
 	}
+
 	openshiftClient, err := osclient.New(config)
 	if err != nil {
-		log.Printf("Error creating OpenShift client: %s", err)
-		os.Exit(2)
+		log.Printf("Error creating OpenShift client: %s. Running in pure Kubernetes mode", err)
 	}
 
 	c := controller.NewController(openshiftClient, kubeClient, &hub)
@@ -102,9 +102,9 @@ func main() {
 
 	c.Start(arbiter)
 
-	c.Load(done)
+	c.Load()
 
-	c.Watch()
+	c.Watch(done)
 
 	c.Stop()
 
@@ -198,8 +198,9 @@ func checkExpectedCmdlineParams() bool {
 		if number < 1 {
 			log.Printf("Setting workers from %d to %d\n", number, controller.MaxWorkers)
 			hub.Workers = controller.MaxWorkers
+		} else {
+			hub.Workers = number
 		}
-		hub.Workers = number
 	}
 
 	if (strings.Compare(strings.ToLower(hub.Config.Scheme), "http") == 0 && strings.Compare(hub.Config.Port, "80") == 0) ||

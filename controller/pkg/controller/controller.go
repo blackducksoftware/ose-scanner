@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
@@ -46,6 +47,11 @@ type HubParams struct {
 	Version string
 }
 
+type PodInfo struct {
+	namespace string
+	name      string
+}
+
 type Controller struct {
 	openshiftClient *osclient.Client
 	kubeClient      *kclient.Client
@@ -56,6 +62,7 @@ type Controller struct {
 	wait            sync.WaitGroup
 	images          map[string]*ScanImage
 	annotation      *bdscommon.Annotator
+	imageUsage      map[string][]PodInfo
 	sync.RWMutex
 	hubParams *HubParams
 }
@@ -77,6 +84,7 @@ func NewController(os *osclient.Client, kc *kclient.Client, hub *HubParams) *Con
 		images:          make(map[string]*ScanImage),
 		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
 		hubParams:       hub,
+		imageUsage:      make(map[string][]PodInfo),
 	}
 }
 
@@ -90,7 +98,7 @@ func (c *Controller) Start(arb *Arbiter) {
 	return
 }
 
-func (c *Controller) Watch() {
+func (c *Controller) Watch(done <-chan struct{}) {
 
 	log.Println("Starting watcher ....")
 	watcher := NewWatcher(c.openshiftClient, c)
@@ -111,13 +119,19 @@ func (c *Controller) Stop() {
 
 }
 
-func (c *Controller) Load(done <-chan struct{}) {
+func (c *Controller) Load() {
 
 	log.Println("Starting load of existing images ...")
 
-	c.getImages(done)
+	c.getImages()
 
 	log.Println("Done load of existing images.")
+
+	log.Println("Starting load of existing pods ...")
+
+	c.getPods()
+
+	log.Println("Done load of existing pods.")
 
 	return
 }
@@ -185,12 +199,7 @@ func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
 		controller: c,
 	}
 
-	ok, info := job.GetAnnotationInfo()
-	if !ok {
-		log.Printf("Error testing prior image status for image %s\n", imageItem.digest)
-	}
-
-	if !c.annotation.IsScanNeeded(info, imageItem.sha, c.hubParams.Config) {
+	if !job.IsImageStreamScanNeeded(c.hubParams.Config) {
 		log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
 		imageItem.scanned = true
 		return
@@ -231,7 +240,13 @@ func (c *Controller) RemoveImage(ID string, Reference string) {
 
 }
 
-func (c *Controller) getImages(done <-chan struct{}) {
+func (c *Controller) getImages() {
+
+	if c.openshiftClient == nil {
+		// if there's no OpenShift client, there can't be any image annotations
+		log.Println("Not running in OpenShift mode")
+		return
+	}
 
 	imageList, err := c.openshiftClient.Images().List(kapi.ListOptions{})
 
@@ -245,12 +260,118 @@ func (c *Controller) getImages(done <-chan struct{}) {
 		return
 	}
 
-	for _, image := range imageList.Items {
+	images := imageList.Items
+
+	log.Printf("Discovered %d images\n", len(images))
+
+	for _, image := range images {
 		c.AddImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	log.Printf("Queued all images\n")
+
+	return
+
+}
+
+func (c *Controller) getPods() {
+
+	podList, err := c.kubeClient.Pods(kapi.NamespaceAll).List(kapi.ListOptions{})
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if podList == nil {
+		log.Println("No running pods")
+		return
+	}
+
+	pods := podList.Items
+
+	log.Printf("Found %d running pods\n", len(pods))
+
+	for _, pod := range pods {
+		time.Sleep(10 * time.Millisecond)
+
+		log.Printf("Discovered pod: %s\n", pod.ObjectMeta.Name)
+
+		if pod.Status.Phase == kapi.PodPending {
+			// defer processing until its running
+			go c.waitPodRunning(pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+			continue
+		}
+
+		if pod.Status.Phase != kapi.PodRunning {
+			log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+			continue
+		}
+
+		c.processPod(&pod)
+
 	}
 
 	return
 
+}
+
+func (c *Controller) waitPodRunning(podName string, namespace string) {
+
+	log.Printf("Waiting for pod %s to enter running state.\n", podName)
+
+	for {
+		pod, err := c.kubeClient.Pods(namespace).Get(podName)
+
+		if err != nil {
+			log.Printf("Error getting pod %s. Error: %s\n", podName, err)
+			break
+		}
+
+		if pod.Status.Phase == kapi.PodPending {
+			// defer processing until its running - nominally this delay allows for image download to node
+			time.Sleep(time.Second * 5)
+			continue
+		}
+
+		if pod.Status.Phase != kapi.PodRunning {
+			log.Printf("Pod %s in phase: %s. Expected 'running' - skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+			break
+		}
+
+		c.processPod(pod)
+		break
+	}
+
+}
+
+func (c *Controller) processPod(pod *kapi.Pod) {
+
+	log.Printf("Processing pod %s\n", pod.ObjectMeta.Name)
+
+	d := NewDocker()
+
+	for _, container := range pod.Spec.Containers {
+		log.Printf("\tContainer %s with image %s on pod %s\n", container.Name, container.Image, pod.ObjectMeta.Name)
+
+		digests, imageId, found := d.digestFromImage(container.Image)
+
+		if !found {
+			log.Printf("\tImage %s not found\n", container.Image)
+			continue
+		}
+
+		for _, digest := range digests {
+			log.Printf("\tFound pod image %s: %s\n", imageId, digest)
+			c.AddImage(imageId, digest)
+			c.registerPodUsage(digest, pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+		}
+	}
+}
+
+func (c *Controller) registerPodUsage(image string, podName string, namespace string) {
+	c.imageUsage[image] = append(c.imageUsage[image], PodInfo{namespace, podName})
 }
 
 func (c *Controller) ValidateConfig() bool {

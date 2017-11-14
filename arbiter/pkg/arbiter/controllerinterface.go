@@ -174,7 +174,7 @@ func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon, image
 	arb.Lock()
 	defer arb.Unlock()
 
-	arb.setStatus(true, image.ImageSpec)
+	arb.setImageStatus(true, image.ImageSpec)
 
 	cd.CompleteScan(image.ImageSpec)
 

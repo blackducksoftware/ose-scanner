@@ -30,8 +30,8 @@ import (
 	"time"
 )
 
-const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
-const scannerHubServerLabel = "blackducksoftware.com/attestation-hub-server"
+const ScannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
+const ScannerHubServerLabel = "blackducksoftware.com/attestation-hub-server"
 const ScannerScanId = "blackducksoftware.com/scan-id"
 const ScannerProjectVersionUrl = "blackducksoftware.com/project-endpoint"
 
@@ -41,11 +41,11 @@ type Annotator struct {
 }
 
 type ImageInfo struct {
-	Labels      map[string]string
-	Annotations map[string]string
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
-// Create a new annotator
+// NewAnnotator creates a new annotator
 func NewAnnotator(ScannerVersion string, HubServer string) *Annotator {
 	wc := &Annotator{
 		ScannerVersion: ScannerVersion,
@@ -65,7 +65,7 @@ func mapMerge(base map[string]string, new map[string]string) map[string]string {
 		// if we're overwriting w/ a new value, log.  Don't overlog b/c we expect the arbiter
 		// to overwrite quite often (every 30 minutes checks in with KB).
 		if v != newMap[k] {
-			log.Printf("Image annotation update: [ %s ] FROM %s TO %s", k, newMap[k], v)
+			log.Printf("Image annotation update: [ %s ] FROM '%s' TO '%s'", k, newMap[k], v)
 		}
 		newMap[k] = v
 	}
@@ -74,7 +74,7 @@ func mapMerge(base map[string]string, new map[string]string) map[string]string {
 
 // UpdateAnnotations creates a NEW image from an old one, and returns a new image info with annotations and labels from scan results.
 // TODO Rename this function to express the fact that it isn't actually updating any data structure, but rather creating a new one.
-func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string, projectVersionUIUrl string) ImageInfo {
+func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string, projectVersionUIUrl string) ImageInfo {
 	policy := "None"
 	hasPolicyViolations := "false"
 
@@ -99,10 +99,12 @@ func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, ref string, viol
 	inputImageInfo.Labels = mapMerge(inputImageInfo.Labels, newLabels)
 
 	newAnnotations := make(map[string]string)
-	newAnnotations[scannerVersionLabel] = a.ScannerVersion
-	newAnnotations[scannerHubServerLabel] = a.HubServer
+	newAnnotations[ScannerVersionLabel] = a.ScannerVersion
+	newAnnotations[ScannerHubServerLabel] = a.HubServer
 	newAnnotations[ScannerProjectVersionUrl] = projectVersionUrl
-	newAnnotations[ScannerScanId] = scanId
+	if len(scanId) > 0 {
+		newAnnotations[ScannerScanId] = scanId
+	}
 	inputImageInfo.Annotations = mapMerge(inputImageInfo.Annotations, newAnnotations)
 
 	// TODO: What is this commented code for @TMACKEY ?
@@ -185,14 +187,14 @@ func (a *Annotator) IsScanNeeded(info ImageInfo, ref string, hubConfig *HubConfi
 	}
 
 	versionRequired := true
-	bdsVer, ok := annotations[scannerVersionLabel]
+	bdsVer, ok := annotations[ScannerVersionLabel]
 	if ok && (strings.Compare(bdsVer, a.ScannerVersion) == 0) {
 		log.Printf("Image %s has been scanned by our scanner.\n", ref)
 		versionRequired = false
 	}
 
 	hubRequired := true
-	hubHost, ok := annotations[scannerHubServerLabel]
+	hubHost, ok := annotations[ScannerHubServerLabel]
 	if ok && (strings.Compare(hubHost, a.HubServer) == 0) {
 		log.Printf("Image %s has been scanned by our Hub server.\n", ref)
 		hubRequired = false

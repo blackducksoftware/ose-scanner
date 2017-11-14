@@ -61,7 +61,7 @@ func (image ScanImage) scanResults(info bdscommon.ImageInfo) (error, bdscommon.I
 		return errors.New("No scan ID found"), info
 	}
 
-	return bdscommon.ScanResults(info, image.taggedName, image.imageId, scanId, image.sha, image.annotate, Hub.Config)
+	return bdscommon.ScanResults(image.taggedName, image.imageId, scanId, image.sha, image.annotate, Hub.Config)
 }
 
 func (image ScanImage) versionResults(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
