@@ -117,7 +117,7 @@ func (job Job) getPodAnnotationInfo(pod *kapi.Pod, podName string) (info bdscomm
 	return info
 }
 
-// UpdatePodAnnotationInfo updates an existing pod annotations/lables with our scna results
+// UpdatePodAnnotationInfo updates an existing pod annotations/lables with our scan results
 func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo bdscommon.ImageInfo) bool {
 
 	if job.controller.kubeClient == nil {
