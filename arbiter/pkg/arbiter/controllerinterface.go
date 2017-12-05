@@ -23,6 +23,7 @@ under the License.
 package arbiter
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -85,37 +86,47 @@ func (arb *Arbiter) ListenForControllers() {
 
 }
 
-func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
+func scanAbortLogic(id string, imageHash string, cds map[string]*controllerDaemon, images map[string]*assignImage, assignedImageCount int) (statusCode int, logMessage string, cd *controllerDaemon, image *assignImage, err *jsonErr) {
+	var ok bool
+	cd, ok = cds[id]
 
+	if !ok {
+		logMessage = fmt.Sprintf("Unknown controller [%s] claimed abort for image: %s\n", id, imageHash)
+		statusCode = http.StatusNotFound
+		err = &jsonErr{Code: http.StatusNotFound, Text: "Not Found"}
+		return
+	}
+
+	image, ok = images[imageHash]
+	if !ok {
+		logMessage = fmt.Sprintf("Controller [%s] claimed abort on unknown image: %s\n", id, imageHash)
+		statusCode = http.StatusNotFound
+		err = &jsonErr{Code: http.StatusNotFound, Text: "Not Found"}
+		return
+	}
+
+	statusCode = http.StatusOK
+	logMessage = fmt.Sprintf("Done abortScan - Hub jobs: %d", assignedImageCount)
+	return
+}
+
+func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request scanAbort")
 	params := mux.Vars(r)
-
 	imageHash := params["id"]
 
 	var ci controllerInfo
 	_ = json.NewDecoder(r.Body).Decode(&ci)
 
-	cd, ok := arb.controllerDaemons[ci.Id]
-	if !ok {
-		log.Printf("Unknown controller [%s] claimed abort for image: %s\n", ci.Id, imageHash)
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
-		return
+	statusCode, logMessage, cd, image, err := scanAbortLogic(ci.Id, imageHash, arb.controllerDaemons, arb.assignedImages, arb.assignedImageCount())
+
+	if err == nil {
+		arb.releaseScanForPeer(image, cd, imageHash)
+	} else {
+		json.NewEncoder(w).Encode(err)
 	}
-
-	image, ok := arb.assignedImages[imageHash]
-	if !ok {
-		log.Printf("Controller [%s] claimed abort on unknown image: %s\n", ci.Id, imageHash)
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
-		return
-	}
-
-	arb.releaseScanForPeer(image, cd, imageHash)
-
-	w.WriteHeader(http.StatusOK)
-	log.Printf("Done abortScan - Hub jobs: %d", arb.assignedImageCount())
-
+	w.WriteHeader(statusCode)
+	log.Printf(logMessage)
 }
 
 func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon, imageHash string) {
