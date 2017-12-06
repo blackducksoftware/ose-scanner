@@ -13,12 +13,27 @@ All documentation, including compilation, installation and debugging instruction
 
 ## Release Status
 
-This project is under active development and has had no official releases. We welcome all contributions, and anyone attempting to use the code contained in here should expect rough edges and operational issues until release. If you identify an issue, please raise it, or better yet propose a solution.
+This project is under active development and has had one official releases. We welcome all contributions, and anyone attempting to use the code contained in here should expect some rough edges and operational issues until release. If you identify an issue, please raise it, or better yet propose a solution.
+
+### Contributing
+
+- Note that contributions are best done via pull request. 
+- Its recommended to start small, and propose changes first. Raising an issue and holding discussion will help reduce the iterations during PR review.
+
+### Community Values
+
+Part of any successfull open source project is the ethos that the health of the community is more important then the code itself.  In that spirit, we adopt the values of Cris Nova's kubicorn project, which is both extremely successfull and also an excellent example of how to build a community (https://github.com/kris-nova/kubicorn).
+
+```
+- Infrastructure as software.
+
+We believe that the oh-so important layer of infrastructure should be represented as software (not as code!). We hope that our project demonstrates this idea, so the community can begin thinking in the way of the new paradigm.
+
+- Rainbows and Unicorns
+
+We believe that sharing is important, and encouraging our peers is even more important. Part of contributing to kubicorn means respecting, encouraging, and welcoming others to the project.
+```
 
 ## License
 
-Apache License 2.0
-
-
-
-
+Apache License 2.0 
