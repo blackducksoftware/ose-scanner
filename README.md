@@ -22,19 +22,20 @@ This project is under active development and has had one official releases. We w
 
 ### Community Values
 
-Part of any successful open source project is the ethos that the health of the community is more important then the code itself.  In that spirit, we adopt the values of Cris Nova's kubicorn project, which is both extremely successful and also an excellent example of how to build a community (https://github.com/kris-nova/kubicorn).
+Part of any successful open source project is the ethos that the health of the community is more important then the code itself.  
 
-```
+In that spirit, we adopt the *values of Cris Nova's kubicorn project, which is both extremely successful and also an excellent example of how to build a community around an opensource infrastructure software*  (https://github.com/kris-nova/kubicorn).
+
+We restate the kubicorn core values below and adopt them as our own:
+
 - Infrastructure as software.
 
-We believe that the oh-so important layer of infrastructure should be represented as software (not as code!). We hope that our project demonstrates this idea, so the community can begin thinking in the way of the new paradigm.
+We believe that the oh-so important layer of infrastructure should be represented as software (not as code!). 
 
 - Rainbows and Unicorns
 
 We believe that sharing is important, and encouraging our peers is even more important. Part of contributing to (ose_scanner) means respecting, encouraging, and welcoming others to the project.
-```
 
-Thanks again kris !
 ## License
 
 Apache License 2.0 
