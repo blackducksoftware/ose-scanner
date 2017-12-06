@@ -41,6 +41,35 @@ type Docker struct {
 	shortID string
 }
 
+func (d Docker) digestFromImage(taggedImage string) (digests []string, imageId string, found bool) {
+	imageDetails, err := d.client.InspectImage(taggedImage)
+	if err != nil {
+		log.Printf("Error testing if image %s exists: %s\n", taggedImage, err)
+		found = false
+		return
+	}
+
+	found = true
+	imageId = imageDetails.ID
+	digests = imageDetails.RepoDigests
+
+	return
+}
+
+func (d Docker) imageFromSpec(spec string) (imageId string, found bool) {
+	imageDetails, err := d.client.InspectImage(spec)
+	if err != nil {
+		log.Printf("Error testing if image %s exists for imageID discovery: %s\n", spec, err)
+		found = false
+		return
+	}
+
+	found = true
+	imageId = imageDetails.ID
+
+	return
+}
+
 func (d Docker) imageExists(image string) bool {
 	imageDetails, err := d.client.InspectImage(image)
 	if err != nil {

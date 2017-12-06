@@ -1,0 +1,91 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: scan-controller
+  namespace: blackduck-scan
+spec:
+  selector:
+      matchLabels:
+        name: bds-controller 
+  template:
+    metadata:
+      name: scan-controller
+      namespace: blackduck-scan
+      labels:
+        name: bds-controller
+      annotations:
+        openshift.io/scc: privileged
+    spec:
+      volumes:
+        -
+          name: dockersocket
+          hostPath:
+            path: /var/run/docker.sock
+      containers:
+        - name: scan-precache-sidecar 
+          image: '%SCANNER%'
+          env:
+          - name: BDS_LISTEN
+            value: '9036'   
+          command:
+            - /ose_scanner    
+          terminationMessagePath: /dev/termination-log
+          imagePullPolicy: Always            
+        - name: scan-controller
+          image: '%CONTROLLER%'
+          env:
+          - name: BDS_HOST
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: hostname
+          - name: BDS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: port
+          - name: BDS_SCHEME
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: scheme
+          - name: BDS_USER
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: user
+          - name: BDS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: password
+          - name: BDS_INSECURE_HTTPS
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: insecuretls
+          - name: BDS_SCANNER
+            value: '%SCANNER%'
+          - name: BDS_WORKERS
+            value: '%WORKERS%'
+          command:
+            - /ose_controller
+          resources:
+            requests:
+              cpu: 50m
+            limits:
+              cpu: 500m
+          volumeMounts:
+            -
+              name: dockersocket
+              mountPath: /var/run/docker.sock
+          terminationMessagePath: /dev/termination-log
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccountName: blackduck-scan
+      serviceAccount: blackduck-scan
+      securityContext:

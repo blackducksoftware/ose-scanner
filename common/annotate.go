@@ -23,13 +23,15 @@ under the License.
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
-const scannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
-const scannerHubServerLabel = "blackducksoftware.com/attestation-hub-server"
+const ScannerVersionLabel = "blackducksoftware.com/hub-scanner-version"
+const ScannerHubServerLabel = "blackducksoftware.com/attestation-hub-server"
 const ScannerScanId = "blackducksoftware.com/scan-id"
 const ScannerProjectVersionUrl = "blackducksoftware.com/project-endpoint"
 
@@ -39,13 +41,12 @@ type Annotator struct {
 }
 
 type ImageInfo struct {
-	Labels      map[string]string
-	Annotations map[string]string
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
-// Create a new annotator
+// NewAnnotator creates a new annotator
 func NewAnnotator(ScannerVersion string, HubServer string) *Annotator {
-
 	wc := &Annotator{
 		ScannerVersion: ScannerVersion,
 		HubServer:      HubServer,
@@ -53,9 +54,27 @@ func NewAnnotator(ScannerVersion string, HubServer string) *Annotator {
 	return wc
 }
 
-// UpdateAnnotations updates the image annotations and labels with the current scan results
-func (a *Annotator) UpdateAnnotations(info ImageInfo, ref string, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string) ImageInfo {
+func mapMerge(base map[string]string, new map[string]string) map[string]string {
+	newMap := make(map[string]string)
+	if base != nil {
+		for k, v := range base {
+			newMap[k] = v
+		}
+	}
+	for k, v := range new {
+		// if we're overwriting w/ a new value, log.  Don't overlog b/c we expect the arbiter
+		// to overwrite quite often (every 30 minutes checks in with KB).
+		if v != newMap[k] {
+			log.Printf("Image annotation update: [ %s ] FROM '%s' TO '%s'", k, newMap[k], v)
+		}
+		newMap[k] = v
+	}
+	return newMap
+}
 
+// UpdateAnnotations creates a NEW image from an old one, and returns a new image info with annotations and labels from scan results.
+// TODO Rename this function to express the fact that it isn't actually updating any data structure, but rather creating a new one.
+func (a *Annotator) UpdateAnnotations(inputImageInfo ImageInfo, violations int, vulnerabilitiies int, projectVersionUrl string, scanId string, projectVersionUIUrl string) ImageInfo {
 	policy := "None"
 	hasPolicyViolations := "false"
 
@@ -72,35 +91,89 @@ func (a *Annotator) UpdateAnnotations(info ImageInfo, ref string, violations int
 		hasVulns = "true"
 	}
 
-	labels := info.Labels
-	if labels == nil {
-		log.Printf("Image %s has no labels - creating.\n", ref)
-		labels = make(map[string]string)
+	newLabels := make(map[string]string)
+	newLabels["com.blackducksoftware.image.policy-violations"] = policy
+	newLabels["com.blackducksoftware.image.has-policy-violations"] = hasPolicyViolations
+	newLabels["com.blackducksoftware.image.vulnerabilities"] = vulns
+	newLabels["com.blackducksoftware.image.has-vulnerabilities"] = hasVulns
+	inputImageInfo.Labels = mapMerge(inputImageInfo.Labels, newLabels)
+
+	newAnnotations := make(map[string]string)
+	newAnnotations[ScannerVersionLabel] = a.ScannerVersion
+	newAnnotations[ScannerHubServerLabel] = a.HubServer
+	newAnnotations[ScannerProjectVersionUrl] = projectVersionUrl
+	if len(scanId) > 0 {
+		newAnnotations[ScannerScanId] = scanId
 	}
-	labels["com.blackducksoftware.image.policy-violations"] = policy
-	labels["com.blackducksoftware.image.has-policy-violations"] = hasPolicyViolations
+	inputImageInfo.Annotations = mapMerge(inputImageInfo.Annotations, newAnnotations)
 
-	labels["com.blackducksoftware.image.vulnerabilities"] = vulns
-	labels["com.blackducksoftware.image.has-vulnerabilities"] = hasVulns
-	info.Labels = labels
-
-	annotations := info.Annotations
-	if annotations == nil {
-		log.Printf("Image %s has no annotations - creating.\n", ref)
-		annotations = make(map[string]string)
-	}
-
-	annotations[scannerVersionLabel] = a.ScannerVersion
-	annotations[scannerHubServerLabel] = a.HubServer
-	annotations[ScannerProjectVersionUrl] = projectVersionUrl
-	annotations[ScannerScanId] = scanId
-
+	// TODO: What is this commented code for @TMACKEY ?
 	//attestation := fmt.Sprintf("%s~%s", component, project)
 	//annotations["blackducksoftware.com/attestation"] = base64.StdEncoding.EncodeToString([]byte(project))
-	info.Annotations = annotations
 
-	return info
+	vulnAnnotations := a.CreateBlackduckVulnerabilityAnnotation(hasVulns == "true", projectVersionUIUrl, vulns)
+	policyAnnotations := a.CreateBlackduckPolicyAnnotation(hasPolicyViolations == "true", projectVersionUIUrl, policy)
 
+	inputImageInfo.Annotations["quality.images.openshift.io/vulnerability.blackduck"] = vulnAnnotations.AsString()
+	inputImageInfo.Annotations["quality.images.openshift.io/policy.blackduck"] = policyAnnotations.AsString()
+
+	return inputImageInfo
+}
+
+type BlackduckAnnotation struct {
+	name        string              `json:"name"`
+	description string              `json:"description"`
+	timestamp   time.Time           `json:"timestamp"`
+	reference   string              `json:"reference"`
+	compliant   bool                `json:"compliant"`
+	summary     []map[string]string `json:"summary"`
+}
+
+// AsString makes a map corresponding to the Openshift Container Security guide (https://people.redhat.com/aweiteka/docs/preview/20170510/security/container_content.html).
+func (o *BlackduckAnnotation) AsString() string {
+	m := make(map[string]string)
+	m["name"] = o.name
+	m["description"] = o.description
+	m["timestamp"] = fmt.Sprintf("%v", o.timestamp)
+	m["reference"] = o.reference
+	m["compliant"] = fmt.Sprintf("%v", o.compliant)
+	m["summary"] = fmt.Sprintf("%s", o.summary)
+	mp, _ := json.Marshal(m)
+	return string(mp)
+}
+
+// CreateOpenshiftAnnotations takes the primitive information from UpdateAnnotation and translates it to openshift.
+func (a *Annotator) CreateBlackduckVulnerabilityAnnotation(hasVulns bool, humanReadableURL string, vulnCount string) *BlackduckAnnotation {
+	return &BlackduckAnnotation{
+		"blackducksoftware",
+		"Vulnerability Info",
+		time.Now(),
+		humanReadableURL,
+		!hasVulns, // no vunls -> compliant.
+		[]map[string]string{
+			{
+				"label":         "high",
+				"score":         fmt.Sprintf("%s", vulnCount),
+				"severityIndex": fmt.Sprintf("%v", 1),
+			},
+		},
+	}
+}
+func (a *Annotator) CreateBlackduckPolicyAnnotation(hasPolicyViolations bool, humanReadableURL string, policyCount string) *BlackduckAnnotation {
+	return &BlackduckAnnotation{
+		"blackducksoftware",
+		"Policy Info",
+		time.Now(),
+		humanReadableURL,
+		!hasPolicyViolations, // no violations -> compliant
+		[]map[string]string{
+			{
+				"label":         "important",
+				"score":         fmt.Sprintf("%s", policyCount),
+				"severityIndex": fmt.Sprintf("%v", 1),
+			},
+		},
+	}
 }
 
 // Determine if a scan of the specified image is required
@@ -114,14 +187,14 @@ func (a *Annotator) IsScanNeeded(info ImageInfo, ref string, hubConfig *HubConfi
 	}
 
 	versionRequired := true
-	bdsVer, ok := annotations[scannerVersionLabel]
+	bdsVer, ok := annotations[ScannerVersionLabel]
 	if ok && (strings.Compare(bdsVer, a.ScannerVersion) == 0) {
 		log.Printf("Image %s has been scanned by our scanner.\n", ref)
 		versionRequired = false
 	}
 
 	hubRequired := true
-	hubHost, ok := annotations[scannerHubServerLabel]
+	hubHost, ok := annotations[ScannerHubServerLabel]
 	if ok && (strings.Compare(hubHost, a.HubServer) == 0) {
 		log.Printf("Image %s has been scanned by our Hub server.\n", ref)
 		hubRequired = false

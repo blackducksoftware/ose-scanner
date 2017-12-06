@@ -69,17 +69,17 @@ func (w Worker) Start() {
 
 func (w Worker) RequestScanAuthorization(job Job) {
 
-	spec := job.ScanImage.digest
+	image := job.ScanImage
 
-	log.Printf("Received scan job for image %s\n", spec)
+	log.Printf("Received scan job for image %s:%s\n", image.digest, image.imageId)
 
-	if !job.ScanImage.exists() {
-		log.Printf("Image %s not in local Docker engine. Skipping scan.\n", spec)
+	if !image.exists() {
+		log.Printf("Image %s not in local Docker engine. Skipping scan.\n", image.digest)
 		return
 	}
 
-	if job.imageScanned(spec) {
-		log.Printf("Image %s previously queued and scanned. Skipping scan.\n", spec)
+	if job.imageScanned(image.digest) {
+		log.Printf("Image %s previously queued and scanned. Skipping scan.\n", image.digest)
 		return
 	}
 
@@ -89,26 +89,26 @@ func (w Worker) RequestScanAuthorization(job Job) {
 			break
 		}
 
-		log.Printf("Arbiter peer offline. Postponing scan of image: %s\n", spec)
+		log.Printf("Arbiter peer offline. Postponing scan of image: %s\n", image.digest)
 		// in the real world we shouldn't ever be offline from our arbiter
 		time.Sleep(time.Second * 30)
 		continue
 	}
 
-	_, skip := w.arbiter.alertImage(spec)
+	_, skip := w.arbiter.alertImage(image.digest, image.imageId)
 
 	if skip {
-		log.Printf("Skipping scan of alerted image at arbiter direction: %s\n", spec)
+		log.Printf("Skipping scan of alerted image at arbiter direction: %s\n", image.digest)
 		return
 	}
 
-	log.Printf("Requesting authorization to scan image %s\n", spec)
+	log.Printf("Requesting authorization to scan image %s\n", image.digest)
 
 	for {
-		requestHash, skip, startScan := w.arbiter.requestImage(spec)
+		requestHash, skip, startScan := w.arbiter.requestImage(image.digest, image.imageId)
 
 		if skip {
-			log.Printf("Skipping scan of image at arbiter direction: %s\n", spec)
+			log.Printf("Skipping scan of image at arbiter direction: %s\n", image.digest)
 			break
 		}
 
@@ -117,32 +117,33 @@ func (w Worker) RequestScanAuthorization(job Job) {
 			continue
 		}
 
-		ok, info := job.GetAnnotationInfo()
-		if !ok {
-			log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
-		}
+		log.Printf("Starting scan of %s with arbiter hash of %s\n", image.digest, requestHash)
 
-		log.Printf("Starting scan of %s with arbiter hash of %s\n", spec, requestHash)
+		err, results, completed := image.scan()
 
-		err, results := job.ScanImage.scan(info)
 		if err != nil {
-			log.Printf("Scan image error for %s of %s\n", spec, err)
+			log.Printf("Scan image error for %s of %s\n", image.digest, err)
 			w.arbiter.abortScan(requestHash) // abort will return the item to the arbiter queue, but remove it from ours
 			break
 		}
 
-		if ok && err == nil {
-			ok = job.UpdateAnnotationInfo(results)
+		if completed {
+			ok := job.UpdateImageAnnotationInfo(results)
 			if ok {
-				log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
+				log.Printf("Updated annotation info for image: %s\n", image.digest)
 			}
+			ok = job.ApplyAnnotationInfoToPods(image.digest, results)
+			if ok {
+				log.Printf("Applied annotation info for pod set.\n")
+			}
+			w.arbiter.scanDone(requestHash)
+		} else {
+			w.arbiter.abortScan(requestHash)
 		}
-
-		w.arbiter.scanDone(requestHash)
 		break
 	}
 
-	log.Printf("Completed processing for image %s\n", spec)
+	log.Printf("Completed processing for image %s\n", image.digest)
 	return
 
 }

@@ -47,18 +47,24 @@ type HubParams struct {
 
 var Hub HubParams
 
+type PodInfo struct {
+	namespace string
+	name      string
+}
+
 type Arbiter struct {
 	openshiftClient   *osclient.Client
 	kubeClient        *kclient.Client
 	mapper            meta.RESTMapper
 	typer             runtime.ObjectTyper
 	f                 *clientcmd.Factory
-	jobQueue          chan Job
+	jobQueue          chan *Job
 	wait              sync.WaitGroup
 	controllerDaemons map[string]*controllerDaemon
 	images            map[string]*ScanImage
 	requestedImages   map[string]string
 	assignedImages    map[string]*assignImage
+	imageUsage        map[string][]PodInfo
 	annotation        *bdscommon.Annotator
 	lastScan          time.Time
 	sync.RWMutex
@@ -71,7 +77,7 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 
 	Hub = hub
 
-	jobQueue := make(chan Job)
+	jobQueue := make(chan *Job)
 
 	return &Arbiter{
 		openshiftClient:   os,
@@ -85,6 +91,7 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 		assignedImages:    make(map[string]*assignImage),
 		controllerDaemons: make(map[string]*controllerDaemon),
 		annotation:        bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
+		imageUsage:        make(map[string][]PodInfo),
 	}
 }
 
@@ -99,6 +106,7 @@ func (arb *Arbiter) Start() {
 		for t := range ticker.C {
 			log.Println("Processing notification status at: ", t)
 			arb.queueImagesForNotification()
+			arb.queuePodsForNotification()
 		}
 	}()
 
@@ -132,9 +140,14 @@ func (arb *Arbiter) Load(done <-chan struct{}) {
 
 	arb.getImages(done)
 
-	log.Println("Done load of existing images. Waiting for initial processing to complete")
+	log.Println("Starting load of existing pods ...")
+
+	arb.getPods()
+
+	log.Println("Done load of existing configuration. Waiting for initial processing to complete...")
 
 	arb.queueImagesForNotification()
+	arb.queuePodsForNotification()
 
 	arb.lastScan = time.Now()
 	duration := time.Since(arb.lastScan)
@@ -149,7 +162,7 @@ func (arb *Arbiter) Load(done <-chan struct{}) {
 	return
 }
 
-func (arb *Arbiter) setStatus(result bool, Reference string) {
+func (arb *Arbiter) setImageStatus(result bool, Reference string) {
 	image, ok := arb.images[Reference]
 	if ok {
 		image.scanned = result
@@ -161,11 +174,22 @@ func (arb *Arbiter) setStatus(result bool, Reference string) {
 	arb.lastScan = time.Now()
 }
 
-func (arb *Arbiter) Done(result bool, Reference string) {
+func (arb *Arbiter) DoneScan(result bool, Reference string) {
 	arb.Lock()
 	defer arb.Unlock()
 
-	arb.setStatus(result, Reference)
+	arb.setImageStatus(result, Reference)
+
+	arb.wait.Done()
+}
+
+func (arb *Arbiter) DonePod(Reference string) {
+	arb.Lock()
+	defer arb.Unlock()
+
+	log.Printf("Done processing pod image %s\n", Reference)
+
+	arb.lastScan = time.Now()
 
 	arb.wait.Done()
 
@@ -191,47 +215,158 @@ func (arb *Arbiter) addImage(ID string, Reference string) {
 
 func (arb *Arbiter) queueImagesForNotification() {
 	for _, image := range arb.images {
-		log.Printf("Queuing %s for notification check\n", image.digest)
-		job := Job{
-			ScanImage: image,
-			arbiter:   arb,
-		}
+		log.Printf("Queuing image %s for notification check\n", image.digest)
+		job := newJob(image, nil, arb)
 
 		job.Load()
 		arb.jobQueue <- job
+	}
+}
 
+func (arb *Arbiter) queuePodsForNotification() {
+	for imageName, podInfo := range arb.imageUsage {
+		log.Printf("Queuing pod image %s for notification check\n", imageName)
+
+		pi := newPodImage(imageName, podInfo, arb.annotation)
+		job := newJob(nil, pi, arb)
+
+		job.Load()
+		arb.jobQueue <- job
 	}
 }
 
 func (arb *Arbiter) getImages(done <-chan struct{}) {
 
-	imageList, err := arb.openshiftClient.Images().List(kapi.ListOptions{})
+	if arb.openshiftClient != nil {
 
-	if err != nil {
-		log.Println(err)
-		return
-	}
+		imageList, err := arb.openshiftClient.Images().List(kapi.ListOptions{})
 
-	if imageList == nil {
-		log.Println("No images")
-		return
-	}
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
-	for _, image := range imageList.Items {
-		arb.addImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		if imageList == nil {
+			log.Println("No images")
+			return
+		}
+
+		for _, image := range imageList.Items {
+			arb.addImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		}
+
 	}
 
 	return
 
 }
 
+func (arb *Arbiter) getPods() {
+
+	podList, err := arb.kubeClient.Pods(kapi.NamespaceAll).List(kapi.ListOptions{})
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if podList == nil {
+		log.Println("No running pods")
+		return
+	}
+
+	pods := podList.Items
+
+	log.Printf("Found %d running pods\n", len(pods))
+
+	arb.Lock()
+	arb.imageUsage = make(map[string][]PodInfo) // clear for resync
+	arb.Unlock()
+
+	for _, pod := range pods {
+		time.Sleep(5 * time.Millisecond) // on large systems allow for some time to breathe
+
+		log.Printf("Discovered pod: %s\n", pod.ObjectMeta.Name)
+
+		if pod.Status.Phase == kapi.PodPending {
+			go arb.waitPodRunning(pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+			continue
+		} else if pod.Status.Phase == kapi.PodRunning {
+			arb.processPod(&pod)
+			continue
+		} else {
+			log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+			continue
+		}
+	}
+
+	return
+}
+
+func (arb *Arbiter) waitPodRunning(podName string, namespace string) {
+
+	log.Printf("Waiting for pod %s to enter running state.\n", podName)
+
+	for {
+		pod, err := arb.kubeClient.Pods(namespace).Get(podName)
+
+		if err != nil {
+			log.Printf("Error getting pod %s. Error: %s\n", podName, err)
+			break
+		}
+
+		if pod.Status.Phase == kapi.PodPending {
+			// defer processing until its running - nominally this delay allows for image download to node
+			time.Sleep(time.Millisecond * 50)
+			continue
+		}
+
+		if pod.Status.Phase != kapi.PodRunning {
+			log.Printf("Pod %s in phase: %s. Expected 'running' - skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+			break
+		}
+
+		arb.processPod(pod)
+		break
+	}
+
+}
+
+func (arb *Arbiter) processPod(pod *kapi.Pod) {
+
+	log.Printf("Processing pod %s\n", pod.ObjectMeta.Name)
+
+	statuses := map[string]kapi.ContainerStatus{}
+	for _, status := range pod.Status.ContainerStatuses {
+		statuses[status.Name] = status
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		status := statuses[container.Name]
+		log.Printf("\tInit Container %s with image %s having ID %s on pod %s\n", container.Name, container.Image, status.ImageID, pod.ObjectMeta.Name)
+		arb.registerPodUsage(status.ImageID, pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+	}
+
+	for _, container := range pod.Spec.Containers {
+		status := statuses[container.Name]
+		log.Printf("\tContainer %s with image %s having ID %s on pod %s\n", container.Name, container.Image, status.ImageID, pod.ObjectMeta.Name)
+		arb.registerPodUsage(status.ImageID, pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+	}
+}
+
+func (arb *Arbiter) registerPodUsage(image string, podName string, namespace string) {
+
+	arb.Lock()
+	defer arb.Unlock()
+
+	arb.imageUsage[image] = append(arb.imageUsage[image], PodInfo{namespace, podName})
+}
+
 // ValidateConfig validates if the Hub server configuration is valid. A login attempt will be performed.
 func (arb *Arbiter) ValidateConfig() bool {
-
-	hubServer := bdscommon.HubServer{Config: Hub.Config}
-
+	hubServer := bdscommon.NewHubServer(Hub.Config)
+	defer hubServer.Logout()
 	return hubServer.Login()
-
 }
 
 func init() {

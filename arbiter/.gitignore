@@ -2,6 +2,10 @@
 *.o
 *.a
 *.so
+*.crt
+
+# ignore license file created during build - project root is the correct one
+LICENSE
 
 # Folders
 _obj

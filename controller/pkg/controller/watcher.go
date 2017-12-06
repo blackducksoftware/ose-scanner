@@ -59,34 +59,34 @@ func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
 
 func (w *Watcher) Run() {
 
-	log.Println("Subscribing to image stream events ....")
+	if w.openshiftClient != nil {
+		log.Println("Subscribing to image stream events ....")
 
-	_, k8sCtl := framework.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
-				return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
+		_, k8sCtl := framework.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
+					return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
+				},
+				WatchFunc: func(opts kapi.ListOptions) (watch.Interface, error) {
+					return w.openshiftClient.ImageStreams(w.Namespace).Watch(opts)
+				},
 			},
-			WatchFunc: func(opts kapi.ListOptions) (watch.Interface, error) {
-				return w.openshiftClient.ImageStreams(w.Namespace).Watch(opts)
-			},
-		},
-		&imageapi.ImageStream{},
-		time.Minute,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				w.ImageAdded(obj.(*imageapi.ImageStream))
-			},
-			UpdateFunc: func(old, obj interface{}) {
-				w.ImageUpdated(obj.(*imageapi.ImageStream))
-			},
-			DeleteFunc: func(obj interface{}) {
-				w.ImageDeleted(obj.(*imageapi.ImageStream))
-			},
-		})
+			&imageapi.ImageStream{},
+			time.Minute,
+			framework.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					w.ImageAdded(obj.(*imageapi.ImageStream))
+				},
 
-	log.Println("Watching image streams....")
+				DeleteFunc: func(obj interface{}) {
+					w.ImageDeleted(obj.(*imageapi.ImageStream))
+				},
+			})
 
-	go k8sCtl.Run(wait.NeverStop)
+		log.Println("Watching image streams....")
+
+		go k8sCtl.Run(wait.NeverStop)
+	}
 
 	log.Println("Subscribing to pod events ....")
 
@@ -104,7 +104,7 @@ func (w *Watcher) Run() {
 
 	go k8sPodCtl.Run(wait.NeverStop)
 
-	log.Println("Watching image streams....")
+	log.Println("Watching pods....")
 
 	select {}
 }
@@ -118,6 +118,8 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 	}
 
 	digest := is.Spec.DockerImageRepository
+
+	log.Printf("ImageStream created: %s\n", digest)
 
 	for _, events := range tags {
 		tagEvents := events.Items
@@ -135,6 +137,10 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 	}
 }
 
+// care should be used with updates. Per kube docs:
+//    OnUpdate is also called when a re-list happens, and it will
+//      get called even if nothing changed. This is useful for periodically
+//      evaluating or syncing something.
 func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 
 	tags := is.Status.Tags
@@ -144,6 +150,8 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 	}
 
 	digest := is.Spec.DockerImageRepository
+
+	log.Printf("ImageStream updated: %s\n", digest)
 
 	for _, events := range tags {
 		tagEvents := events.Items
@@ -185,10 +193,19 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 }
 
 func (w *Watcher) PodCreated(pod *kapi.Pod) {
-	log.Printf("Pod created: %s\n", pod.ObjectMeta.Name)
+	log.Printf("Pod creation for %s in namespace %s \n", pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
 
-	for _, container := range pod.Spec.Containers {
-		log.Printf("\tPod container %s with image %s on pod %s\n", container.Name, container.Image, pod.ObjectMeta.Name)
-		w.controller.ScanPodImage(container.Image)
+	if pod.Status.Phase == kapi.PodPending {
+		// defer processing until its running
+		go w.controller.waitPodRunning(pod.ObjectMeta.Name, pod.ObjectMeta.Namespace)
+		return
 	}
+
+	if pod.Status.Phase != kapi.PodRunning {
+		log.Printf("Pod %s in phase: %s. Skipping\n", pod.ObjectMeta.Name, pod.Status.Phase)
+		return
+	}
+
+	w.controller.processPod(pod)
+
 }

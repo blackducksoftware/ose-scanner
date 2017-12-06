@@ -42,9 +42,10 @@ type ScanImage struct {
 func newScanImage(ID string, Reference string, annotate *bdscommon.Annotator) *ScanImage {
 
 	tag := strings.Split(Reference, "@")
+	Ids := strings.Split(ID, "sha256:")
 
 	return &ScanImage{
-		imageId:    ID,
+		imageId:    Ids[len(Ids)-1],
 		taggedName: tag[0],
 		sha:        tag[1],
 		digest:     Reference,
@@ -60,7 +61,7 @@ func (image ScanImage) scanResults(info bdscommon.ImageInfo) (error, bdscommon.I
 		return errors.New("No scan ID found"), info
 	}
 
-	return bdscommon.ScanResults(info, image.taggedName, image.imageId, scanId, image.sha, image.annotate, Hub.Config)
+	return bdscommon.ScanResults(image.taggedName, image.imageId, scanId, image.sha, image.annotate, Hub.Config)
 }
 
 func (image ScanImage) versionResults(info bdscommon.ImageInfo) (error, bdscommon.ImageInfo) {
@@ -71,12 +72,14 @@ func (image ScanImage) versionResults(info bdscommon.ImageInfo) (error, bdscommo
 		return errors.New("Missing project information"), info
 	}
 
-	hub := bdscommon.HubServer{Config: Hub.Config}
+	hub := bdscommon.NewHubServer(Hub.Config)
+
 	if ok := hub.Login(); !ok {
 		log.Printf("Hub credentials not valid\n")
 		return errors.New("Invalid Hub credentials"), info
 	}
 
-	return bdscommon.ProjectVersionResults(info, image.imageId, image.taggedName, image.sha, scanId, projectVersionUrl, &hub, image.annotate)
+	defer hub.Logout()
 
+	return bdscommon.ProjectVersionResults(info, image.imageId, image.taggedName, image.sha, scanId, projectVersionUrl, hub, image.annotate)
 }

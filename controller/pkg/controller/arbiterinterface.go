@@ -34,6 +34,7 @@ import (
 type imageInfo struct {
 	ControllerID string `json:"id,omitempty"`
 	ImageSpec    string `json:"spec,omitempty"`
+	ImageId      string `json:"image,omitempty"`
 }
 
 type imageResult struct {
@@ -94,14 +95,15 @@ func (a *Arbiter) heartbeat() bool {
 	return true
 }
 
-func (a *Arbiter) alertImage(spec string) (requestHash string, skipScan bool) {
+func (a *Arbiter) alertImage(spec string, id string) (requestHash string, skipScan bool) {
 
-	log.Printf("Notifying arbiter for image %s\n", spec)
+	log.Printf("Notifying arbiter for image %s:%s\n", spec, id)
 
 	var i imageInfo
 
 	i.ControllerID = a.controllerId
 	i.ImageSpec = spec
+	i.ImageId = id
 
 	b, err := json.Marshal(i)
 	if err != nil {
@@ -121,25 +123,32 @@ func (a *Arbiter) alertImage(spec string) (requestHash string, skipScan bool) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated {
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests:
+		log.Printf("Image %s previously requested and in queue\n", spec)
+		return "", true
+
+	case http.StatusCreated:
+		var result imageResult
+		_ = json.NewDecoder(resp.Body).Decode(&result)
+
+		return result.RequestId, false
+
+	default:
 		log.Printf("New image http status error %d\n", resp.StatusCode)
 		return "", true
 	}
 
-	var result imageResult
-	_ = json.NewDecoder(resp.Body).Decode(&result)
-
-	return result.RequestId, false
-
 }
 
-func (a *Arbiter) requestImage(spec string) (requestHash string, skipScan bool, startScan bool) {
+func (a *Arbiter) requestImage(spec string, id string) (requestHash string, skipScan bool, startScan bool) {
 
-	log.Printf("Requesting arbiter authorization for image %s\n", spec)
+	log.Printf("Requesting arbiter authorization for image %s:%s\n", spec, id)
 	var i imageInfo
 
 	i.ControllerID = a.controllerId
 	i.ImageSpec = spec
+	i.ImageId = id
 
 	b, err := json.Marshal(i)
 	if err != nil {

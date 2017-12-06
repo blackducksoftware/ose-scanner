@@ -28,16 +28,16 @@ import (
 
 type Worker struct {
 	id         int
-	jobQueue   chan Job
-	workerPool chan chan Job
+	jobQueue   chan *Job
+	workerPool chan chan *Job
 	quit       chan bool
 }
 
-func NewWorker(index int, workerPool chan chan Job) Worker {
+func NewWorker(index int, workerPool chan chan *Job) Worker {
 	return Worker{
 		id:         index,
 		workerPool: workerPool,
-		jobQueue:   make(chan Job),
+		jobQueue:   make(chan *Job),
 		quit:       make(chan bool),
 	}
 }
@@ -52,23 +52,15 @@ func (w Worker) Start() {
 			select {
 			case job := <-w.jobQueue:
 				scanned := false
-				ok, info := job.GetAnnotationInfo()
-				if !ok {
-					log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
+
+				if job.ScanImage != nil {
+					scanned = w.ProcessScanImage(job)
+				} else if job.PodImage != nil {
+					scanned = w.ProcessPodImage(job)
+				} else {
+					log.Printf("***Error*** Worker %d found job with unknown activity\n", w.id)
 				}
 
-				err, results := job.ScanImage.versionResults(info)
-				if err != nil {
-					log.Printf("Error getting notification results for %s: %s", job.ScanImage.digest, err.Error())
-				}
-
-				if ok && err == nil {
-					ok = job.UpdateAnnotationInfo(results)
-					if ok {
-						scanned = true
-						log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
-					}
-				}
 				job.Done(scanned)
 
 			case <-w.quit:
@@ -78,4 +70,51 @@ func (w Worker) Start() {
 			}
 		}
 	}()
+}
+
+func (w Worker) ProcessScanImage(job *Job) (scanned bool) {
+
+	log.Printf("Processing scan image %s\n", job.ScanImage.digest)
+	scanned = false
+	ok, info := job.GetImageAnnotationInfo()
+	if !ok {
+		log.Printf("Error getting annotation info for image: %s", job.ScanImage.digest)
+		return
+	}
+
+	err, results := job.ScanImage.versionResults(info)
+	if err != nil {
+		log.Printf("Error getting notification results for %s: %s", job.ScanImage.digest, err.Error())
+		return
+	}
+
+	ok = job.UpdateImageAnnotationInfo(results)
+	if ok {
+		scanned = true
+		log.Printf("Updated annotation info for image: %s", job.ScanImage.digest)
+	}
+
+	return
+}
+
+func (w Worker) ProcessPodImage(job *Job) (scanned bool) {
+
+	log.Printf("Processing pod image %s\n", job.PodImage.imageName)
+
+	scanned = false
+
+	err, results := job.PodImage.ScanResults()
+
+	if err != nil {
+		log.Printf("Error getting notification results for pod %s:%s", job.PodImage.imageName, err.Error())
+		return
+	}
+
+	ok := job.ApplyAnnotationInfoToPods(results)
+	if ok {
+		log.Printf("Applied annotation info for pod set %s\n", job.PodImage.imageName)
+		scanned = true
+	}
+
+	return
 }

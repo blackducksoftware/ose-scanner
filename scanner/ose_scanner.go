@@ -40,7 +40,7 @@ import (
 
 const (
 	APP_VERSION                   = "0.1"
-	DEFAULT_BDS_SCANNER_BASE_DIR  = "/tmp/bds-scanner"
+	DEFAULT_BDS_SCANNER_BASE_DIR  = "/tmp/ocp-scanner"
 	CLI_IMPL_JAR_FILE_NAME        = "scan.cli.impl-standalone.jar"
 	BDS_SCANNER_BASE_DIR_VAR_NAME = "SCANNER_BASE_DIR"
 	SCAN_CLI_JAR_NAME_VAR_NAME    = "SCAN_CLI_JAR_NAME"
@@ -53,6 +53,7 @@ type input struct {
 	scheme      string
 	username    string
 	password    string
+	insecure    string
 	imageId     string
 	taggedImage string
 	digest      string
@@ -66,7 +67,8 @@ func init() {
 	flag.StringVar(&in.scheme, "s", "REQUIRED", "The communication scheme [http,https].")
 	flag.StringVar(&in.username, "u", "REQUIRED", "The Black Duck Hub user")
 	flag.StringVar(&in.password, "w", "REQUIRED", "Password for the user. You're not prompted since this is automated run.")
-	flag.StringVar(&in.imageId, "id", "REQUIRED", "Image ID")
+	flag.StringVar(&in.imageId, "id", "REQUIRED", "Engine query image ID")
+	flag.StringVar(&in.insecure, "insecure", "OPTIONAL", "Should insecure TLS be used")
 	flag.StringVar(&in.taggedImage, "tag", "REQUIRED", "Tagged image name")
 	flag.StringVar(&in.digest, "digest", "REQUIRED", "Digest")
 }
@@ -75,11 +77,13 @@ func init() {
 var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
 var dumpFlag *bool = flag.Bool("d", false, "dumps extracted tar in /tmp.")
 
-func scanImage(path string, imageId string, taggedImage string) {
+func scanImage(path string, imageId string, taggedImage string, codeLocation string) {
+	log.Println("Scanning " + taggedImage)
 
-	prefix := imageId[:10]
 	img_arr := strings.Split(taggedImage, "@sha256:")
 	img_name := img_arr[0]
+	img_ps := img_arr[1]
+	prefix := img_ps[:10]
 	project := img_name
 
 	appHomeDir := os.Getenv(APP_HOME_VAR_NAME)
@@ -94,6 +98,8 @@ func scanImage(path string, imageId string, taggedImage string) {
 	cmd := exec.Command("java",
 		"-Xms512m",
 		"-Xmx4096m",
+		"-Dblackduck.scan.cli.benice=true",
+		"-Dblackduck.scan.skipUpdate=true",
 		"-Done-jar.silent=true",
 		"-Done-jar.jar.path="+scanCliImplJarPath,
 		"-jar", scanCliJarPath,
@@ -103,11 +109,15 @@ func scanImage(path string, imageId string, taggedImage string) {
 		"--project", project,
 		"--release", prefix,
 		"--username", in.username,
-		"--password", in.password,
+		"--name", codeLocation,
+		in.insecure,
 		"-v",
 		path)
-	// if we print this out, we're going to print out the password - bad idea
-	//log.Println(cmd.Args)
+
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("BD_HUB_PASSWORD=%s", in.password))
+	cmd.Env = env
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -215,13 +225,6 @@ func imageExists(client *httputil.ClientConn, image string) (result bool, err er
 func getScannerOutputDir() string {
 	// NOTE: At this point we don't have a logger yet, so don't try and use it.
 
-	// Get hostname to use as part of the output path
-	hostname, err := os.Hostname()
-	if err != nil {
-		fmt.Printf("ERROR: getting hostname %s\n", err)
-		hostname = "default-host"
-	}
-
 	// Check to see if we can get the env var for the base dir (we should always be able to)
 	bdsScannerBaseDir := os.Getenv(BDS_SCANNER_BASE_DIR_VAR_NAME)
 
@@ -231,7 +234,7 @@ func getScannerOutputDir() string {
 	}
 
 	// Make base out dir for any scanner output, scans, etc...
-	scannerOutputDir := filepath.Join(bdsScannerBaseDir, hostname)
+	scannerOutputDir := bdsScannerBaseDir
 	os.MkdirAll(scannerOutputDir, os.ModeDir|os.ModePerm)
 
 	fmt.Printf("Scanner Output Dir: %s\n", scannerOutputDir)
@@ -296,6 +299,17 @@ func checkExpectedCmdlineParams() bool {
 		return false
 	}
 
+	switch in.insecure {
+	case "true":
+		fmt.Println("Requested insecure TLS usage")
+		in.insecure = "--insecure"
+		break
+
+	default:
+		in.insecure = ""
+
+	}
+
 	return true
 }
 
@@ -327,11 +341,11 @@ func validatePreCacheMode() {
 	val := os.Getenv("BDS_LISTEN")
 	if val != "9036" {
 		// flag wasn't set, so not in pre-cache mode
-		fmt.Println ("Precache flag missing. Configuring normal mode.")
+		fmt.Println("Precache flag missing. Configuring normal mode.")
 		return
 	}
 
-	fmt.Println ("Operating in pre-cache mode.")
+	fmt.Println("Operating in pre-cache mode.")
 
 	http.HandleFunc("/health", healthy)      // set router
 	err := http.ListenAndServe(":9036", nil) // set listen port
@@ -384,22 +398,26 @@ func main() {
 
 	image := in.imageId
 	digest := in.digest
-	log.Printf("Processing digest: %s\n", digest)
+	log.Printf("Processing image: %s with engine ID %s\n", digest, image)
 	// save image
-	img_dir_name := strings.Replace(image, ":", "_", -1)
+	img_dir_name := strings.Replace(digest, ":", "_", -1)
 	img_dir_name = strings.Replace(img_dir_name, "/", "_", -1)
+
+	codeLocation := "/bdsocp/"
+	codeLocation = strings.Replace(digest, ":", "_", -1)
+	codeLocation = strings.Replace(codeLocation, "/", "_", -1)
 	path := fmt.Sprintf("%s/%s", scannerOutputDir, img_dir_name)
 	log.Println(path)
 
 	if strings.Contains(path, "<none>") {
-		log.Printf("WARNING : image : %s won't be scanned.", image)
+		log.Printf("WARNING: Image : %s won't be scanned.", digest)
 	} else {
-		newTarPath, err := saveImageToTar(client, digest, path)
+		newTarPath, err := saveImageToTar(client, image, path)
 
 		if err != nil {
 			log.Printf("Error while making tar file: %s\n", err)
 		} else {
-			scanImage(newTarPath, image, in.taggedImage)
+			scanImage(newTarPath, image, digest, codeLocation)
 		}
 
 		if !*dumpFlag {

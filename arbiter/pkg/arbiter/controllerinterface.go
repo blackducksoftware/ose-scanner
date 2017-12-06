@@ -25,6 +25,7 @@ package arbiter
 import (
 	"log"
 	"strings"
+
 	"time"
 
 	"encoding/hex"
@@ -41,6 +42,7 @@ import (
 type imageInfo struct {
 	ControllerID string `json:"id,omitempty"`
 	ImageSpec    string `json:"spec,omitempty"`
+	ImageId      string `json:"image,omitempty"`
 }
 
 type imageResult struct {
@@ -59,6 +61,11 @@ type assignImage struct {
 type jsonErr struct {
 	Code int    `json:"code"`
 	Text string `json:"text"`
+}
+
+func (arb *Arbiter) CanSendHubJobs() bool {
+	// this is hardcoded for the moment, but should be a function of Hub job runners
+	return arb.assignedImageCount() < 7
 }
 
 func (arb *Arbiter) ListenForControllers() {
@@ -104,20 +111,28 @@ func (arb *Arbiter) scanAbort(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	arb.releaseScanForPeer(image, cd)
+	arb.releaseScanForPeer(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
-
-	log.Println("Done scanAbort")
+	log.Printf("Done abortScan - Hub jobs: %d", arb.assignedImageCount())
 
 }
 
-func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon) {
+func (arb *Arbiter) releaseScanForPeer(image *assignImage, cd *controllerDaemon, imageHash string) {
 
 	arb.Lock()
 	defer arb.Unlock()
 
 	cd.AbortScan(image.ImageSpec)
+	delete(arb.assignedImages, imageHash)
+}
+
+func (arb *Arbiter) assignedImageCount() int {
+
+	arb.Lock()
+	defer arb.Unlock()
+
+	return len(arb.assignedImages)
 }
 
 func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
@@ -146,22 +161,20 @@ func (arb *Arbiter) scanDone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	arb.finalizeScan(image, cd)
-
-	delete(arb.assignedImages, imageHash)
+	arb.finalizeScan(image, cd, imageHash)
 
 	w.WriteHeader(http.StatusOK)
 
-	log.Println("Done scanDone")
+	log.Printf("Done scanDone - Hub jobs: %d", arb.assignedImageCount())
 
 }
 
-func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon) {
+func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon, imageHash string) {
 
 	arb.Lock()
 	defer arb.Unlock()
 
-	arb.setStatus(true, image.ImageSpec)
+	arb.setImageStatus(true, image.ImageSpec)
 
 	cd.CompleteScan(image.ImageSpec)
 
@@ -175,6 +188,7 @@ func (arb *Arbiter) finalizeScan(image *assignImage, cd *controllerDaemon) {
 	}
 
 	delete(arb.requestedImages, image.ImageSpec)
+	delete(arb.assignedImages, imageHash)
 }
 
 func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {
@@ -213,6 +227,7 @@ func (arb *Arbiter) processingImage(w http.ResponseWriter, r *http.Request) {
 func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 	log.Println("Request assignScan")
 	var i imageInfo
+	var resp imageResult
 
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
@@ -220,6 +235,23 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Got junk on assignScan API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(jsonErr{Code: http.StatusNotFound, Text: "Not Found"})
+		return
+	}
+
+	if !arb.CanSendHubJobs() {
+		resp.RequestId = ""
+		resp.StartScan = false
+		resp.SkipScan = false
+
+		w.WriteHeader(http.StatusOK)
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			log.Printf("Error encoding busy image response: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Done assignScan - Hub currently busy with other jobs. Requeue %s. - Hub jobs: %d", i.ImageSpec, arb.assignedImageCount())
 		return
 	}
 
@@ -231,16 +263,17 @@ func (arb *Arbiter) assignScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resp imageResult
 	resp.RequestId, resp.StartScan, resp.SkipScan = arb.findWorker(i.ImageSpec, cd)
+
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding image response: %s\n", err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Println("Done assignScan")
+
+	log.Printf("Done assignScan - Hub jobs: %d", arb.assignedImageCount())
 }
 
 func (arb *Arbiter) findWorker(spec string, cd *controllerDaemon) (string, bool, bool) {
@@ -297,7 +330,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	var i imageInfo
 	_ = json.NewDecoder(r.Body).Decode(&i)
 
-	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 {
+	if len(i.ControllerID) == 0 || len(i.ImageSpec) == 0 || len(i.ImageId) == 0 {
 		log.Printf("Got junk on foundImage API: %s\n", r.Body)
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -306,12 +339,35 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 	cd, ok := arb.controllerDaemons[i.ControllerID]
 	if !ok {
 		log.Printf("Unknown controller [%s] identified image: %s\n", i.ControllerID, i.ImageSpec)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	reqHash, requested := arb.requestedImages[i.ImageSpec]
+	if requested {
+		assignedImage, ok := arb.assignedImages[reqHash]
+		if ok && strings.Compare(cd.info.Id, assignedImage.ControllerID) == 0 {
+			// we can get into a weird race condition during s2i builds, only want to scan once
+			log.Printf("Image %s is already identified for controller %s - Skipping.\n", i.ImageSpec, assignedImage.ControllerID)
+
+			var resp imageResult
+			resp.RequestId = ""
+			resp.StartScan = false
+			resp.SkipScan = true
+
+			w.WriteHeader(http.StatusTooManyRequests)
+
+			if err := json.NewEncoder(w).Encode(resp); err != nil {
+				log.Printf("Error encoding image response: %s\n", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+	}
+
 	var resp imageResult
-	resp.RequestId = arb.saveFoundImage(i.ImageSpec, cd)
+	resp.RequestId = arb.saveFoundImage(i.ImageSpec, i.ImageId, cd)
 	resp.StartScan = false
 	resp.SkipScan = false
 
@@ -319,7 +375,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding image response: %s\n", err)
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -327,7 +383,7 @@ func (arb *Arbiter) foundImage(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (arb *Arbiter) saveFoundImage(spec string, cd *controllerDaemon) string {
+func (arb *Arbiter) saveFoundImage(spec string, id string, cd *controllerDaemon) string {
 	arb.Lock()
 	defer arb.Unlock()
 
@@ -336,7 +392,19 @@ func (arb *Arbiter) saveFoundImage(spec string, cd *controllerDaemon) string {
 		reqHashBytes := md5.Sum([]byte(spec))
 		reqHash = hex.EncodeToString(reqHashBytes[:])
 		arb.requestedImages[spec] = reqHash
-		log.Printf("Added spec %s as %s found by controller %s\n", spec, reqHash, cd.info.Id)
+		log.Printf("Added hash spec %s as %s found by controller %s\n", spec, reqHash, cd.info.Id)
+
+		/* test if the image was already discovered */
+		_, ok := arb.images[spec]
+		if !ok {
+
+			log.Printf("Image %s not represented in an ImageStream. Adding to our map.\n", spec)
+			/* this is essentially a clone of addImage(), but that can't be used here due to recursive locking */
+			imageItem := newScanImage(id, spec, arb.annotation)
+			log.Printf("Added external image %s to map\n", imageItem.digest)
+			arb.images[spec] = imageItem
+		}
+
 	}
 
 	cd.AddScanRequest(spec, reqHash)

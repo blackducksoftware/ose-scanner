@@ -28,6 +28,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"crypto/tls"
+
+	"net/http"
 
 	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
@@ -42,6 +47,7 @@ import (
 )
 
 var bds_version string
+var build_num string
 var hub controller.HubParams
 
 func main() {
@@ -68,13 +74,13 @@ func main() {
 		log.Printf("Error creating cluster config: %s", err)
 		os.Exit(1)
 	}
+
 	openshiftClient, err := osclient.New(config)
 	if err != nil {
-		log.Printf("Error creating OpenShift client: %s", err)
-		os.Exit(2)
+		log.Printf("Error creating OpenShift client: %s. Running in pure Kubernetes mode", err)
 	}
 
-	c := controller.NewController(openshiftClient, kubeClient, hub)
+	c := controller.NewController(openshiftClient, kubeClient, &hub)
 
 	if !c.ValidateDockerConfig() {
 		log.Printf("Docker configuation information isn't valid. Please verify connectivity and permissions.")
@@ -96,9 +102,9 @@ func main() {
 
 	c.Start(arbiter)
 
-	c.Load(done)
+	c.Load()
 
-	c.Watch()
+	c.Watch(done)
 
 	c.Stop()
 
@@ -108,7 +114,7 @@ func init() {
 	log.SetFlags(log.LstdFlags)
 	log.SetOutput(os.Stdout)
 
-	log.Printf("Initializing Black Duck scan controller version %s\n", bds_version)
+	log.Printf("Initializing Black Duck scan controller version %s build %s\n", bds_version, build_num)
 
 	hub.Config = &bdscommon.HubConfig{}
 
@@ -120,6 +126,7 @@ func init() {
 	pflag.StringVar(&hub.Config.User, "u", "REQUIRED", "The Black Duck Hub user")
 	pflag.StringVar(&hub.Config.Password, "w", "REQUIRED", "Password for the user.")
 	pflag.StringVar(&hub.Scanner, "scanner", "REQUIRED", "Scanner image")
+	pflag.StringVar(&hub.Config.Insecure, "i", "OPTIONAL", "Allow insecure TLS.")
 	pflag.IntVar(&hub.Workers, "workers", 0, "Number of container workers")
 }
 
@@ -191,8 +198,9 @@ func checkExpectedCmdlineParams() bool {
 		if number < 1 {
 			log.Printf("Setting workers from %d to %d\n", number, controller.MaxWorkers)
 			hub.Workers = controller.MaxWorkers
+		} else {
+			hub.Workers = number
 		}
-		hub.Workers = number
 	}
 
 	if (strings.Compare(strings.ToLower(hub.Config.Scheme), "http") == 0 && strings.Compare(hub.Config.Port, "80") == 0) ||
@@ -200,6 +208,36 @@ func checkExpectedCmdlineParams() bool {
 		hub.Config.Url = fmt.Sprintf("%s://%s", hub.Config.Scheme, hub.Config.Host)
 	} else {
 		hub.Config.Url = fmt.Sprintf("%s://%s:%s", hub.Config.Scheme, hub.Config.Host, hub.Config.Port)
+	}
+
+	insecureSkipVerify := false
+
+	if strings.Compare(strings.ToLower(hub.Config.Scheme), "https") == 0 {
+		if hub.Config.Insecure == "OPTIONAL" {
+			hub.Config.Insecure = "false"
+			val := os.Getenv("BDS_INSECURE_HTTPS")
+			if val == "" {
+				log.Println("-i insecure argument or BDS_INSECURE_HTTPS environment not specified - assuming secure TLS")
+				insecureSkipVerify = true
+			} else {
+				val = strings.ToLower(val)
+
+				switch val {
+				case "true":
+					log.Println("Insecure TLS communication requested")
+					insecureSkipVerify = true
+					fallthrough
+				case "false":
+					hub.Config.Insecure = val
+				}
+			}
+		}
+	}
+
+	hub.Config.Wire = &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify},
+		MaxIdleConns:    20,
+		IdleConnTimeout: 120 * time.Second, // we have various one minute timeouts in comms, so two should be best for an actual timeout
 	}
 
 	return true
