@@ -16,12 +16,26 @@ All documentation, including compilation, installation and debugging instruction
 This project is under active development and has had one official releases. We welcome all contributions, and anyone attempting to use the code contained in here should expect some rough edges and operational issues until release. If you identify an issue, please raise it, or better yet propose a solution.
 
 ### Contributing
-Note that contributions are best done via pull request. Its recommended to start small, and propose changes first. Raising an issue and holding discussion will help reduce the iterations during PR review.
+
+- Contributions are best done via pull request. 
+- It's recommended to start small, and propose changes first. Raising an issue and holding a discussion will help reduce the iterations during PR review.
+
+### Community Values
+
+Part of any successful open source project is the ethos that the health of the community is more important than the code itself.  
+
+In that spirit, we adopt the *values of Cris Nova's kubicorn project, which is both extremely successful and also an excellent example of how to build a community around an opensource infrastructure software*  (https://github.com/kris-nova/kubicorn).
+
+We restate the kubicorn core values below and adopt them as our own:
+
+- Infrastructure as software.
+
+We believe that the oh-so important layer of infrastructure should be represented as software (not as code!). 
+
+- Rainbows and Unicorns
+
+We believe that sharing is important, and encouraging our peers is even more important. Part of contributing to (ose_scanner) means respecting, encouraging, and welcoming others to the project.
 
 ## License
 
 Apache License 2.0 
-
-
-
-
