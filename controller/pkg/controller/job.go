@@ -180,28 +180,63 @@ func (job Job) mergeAnnotationResults(oldInfo bdscommon.ImageInfo, newInfo bdsco
 }
 
 // IsImageStreamScanNeeded determines if a scan of the specified image in an OpenShift ImageStream is required
-func (job Job) IsImageStreamScanNeeded(hubConfig *bdscommon.HubConfig) bool {
+func (job Job) IsImageStreamScanNeeded(hubConfig *bdscommon.HubConfig) (scanNeeded bool, supportsImageScan bool) {
+	scanNeeded = false
+	supportsImageScan = false
 
 	if job.controller.openshiftClient == nil {
 		// if there's no OpenShift client, there can't be any image annotations
-		return false
+		return
 	}
 
 	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha)
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
-		return false
+		return
 	}
+
+	supportsImageScan = true
 
 	ref := job.ScanImage.digest
 
 	info := job.getImageAnnotationInfo(image)
 
+	scanNeeded = job.validateScanAnnotations(info, ref, hubConfig)
+
+	return
+}
+
+/*
+   IsPodScanNeeded determines if a scan of the specified image in an Pod is required
+   Since a given image can be used in multiple Pods, this test need only validate a single Pod
+*/
+func (job Job) IsPodScanNeeded(hubConfig *bdscommon.HubConfig) (scanNeeded bool) {
+	scanNeeded = false
+
+	ref := job.ScanImage.digest
+
+	pod, podName := job.controller.findSinglePodForSpec(ref)
+
+	if pod == nil {
+		log.Printf("Job: Error getting image %s from pod. Image not found\n", ref)
+		return
+	}
+
+	info := job.getPodAnnotationInfo(pod, podName)
+
+	return job.validateScanAnnotations(info, ref, hubConfig)
+}
+
+func (job Job) validateScanAnnotations(info bdscommon.ImageInfo, ref string, hubConfig *bdscommon.HubConfig) (scanNeeded bool) {
+
+	scanNeeded = false
+
 	annotations := info.Annotations
 	if annotations == nil {
 		// no annotations means we've never been here before
 		log.Printf("Nil annotations on image: %s\n", ref)
-		return true
+		scanNeeded = true
+		return
 	}
 
 	versionRequired := true
@@ -227,8 +262,10 @@ func (job Job) IsImageStreamScanNeeded(hubConfig *bdscommon.HubConfig) bool {
 
 	if versionRequired || hubRequired || projectVersionRescan {
 		log.Printf("Image %s scan required due to missing or invalid configuration\n", ref)
-		return true
+		scanNeeded = true
+		return
 	}
 
-	return false
+	return
+
 }

@@ -64,7 +64,7 @@ type Arbiter struct {
 	images            map[string]*ScanImage
 	requestedImages   map[string]string
 	assignedImages    map[string]*assignImage
-	imageUsage        map[string][]PodInfo
+	imageUsage        map[string]map[string]*PodInfo
 	annotation        *bdscommon.Annotator
 	lastScan          time.Time
 	sync.RWMutex
@@ -91,7 +91,7 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 		assignedImages:    make(map[string]*assignImage),
 		controllerDaemons: make(map[string]*controllerDaemon),
 		annotation:        bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
-		imageUsage:        make(map[string][]PodInfo),
+		imageUsage:        make(map[string]map[string]*PodInfo),
 	}
 }
 
@@ -139,15 +139,13 @@ func (arb *Arbiter) Load(done <-chan struct{}) {
 	log.Println("Starting load of existing images ...")
 
 	arb.getImages(done)
+	arb.queueImagesForNotification()
 
 	log.Println("Starting load of existing pods ...")
 
-	arb.getPods()
+	arb.getPods() // implicitly loads the pod information and queues
 
 	log.Println("Done load of existing configuration. Waiting for initial processing to complete...")
-
-	arb.queueImagesForNotification()
-	arb.queuePodsForNotification()
 
 	arb.lastScan = time.Now()
 	duration := time.Since(arb.lastScan)
@@ -174,6 +172,7 @@ func (arb *Arbiter) setImageStatus(result bool, Reference string) {
 	arb.lastScan = time.Now()
 }
 
+// DoneScan is called by a worker when a scan request is completed
 func (arb *Arbiter) DoneScan(result bool, Reference string) {
 	arb.Lock()
 	defer arb.Unlock()
@@ -183,6 +182,7 @@ func (arb *Arbiter) DoneScan(result bool, Reference string) {
 	arb.wait.Done()
 }
 
+// Done Pod is called by a worker when a pod request is completed
 func (arb *Arbiter) DonePod(Reference string) {
 	arb.Lock()
 	defer arb.Unlock()
@@ -195,6 +195,7 @@ func (arb *Arbiter) DonePod(Reference string) {
 
 }
 
+// Add queues an object for processing
 func (arb *Arbiter) Add() {
 	arb.wait.Add(1)
 }
@@ -224,15 +225,21 @@ func (arb *Arbiter) queueImagesForNotification() {
 }
 
 func (arb *Arbiter) queuePodsForNotification() {
-	for imageName, podInfo := range arb.imageUsage {
+	for imageName, podMap := range arb.imageUsage {
 		log.Printf("Queuing pod image %s for notification check\n", imageName)
 
-		pi := newPodImage(imageName, podInfo, arb.annotation)
-		job := newJob(nil, pi, arb)
-
-		job.Load()
-		arb.jobQueue <- job
+		for _, podInfo := range podMap {
+			arb.queuePod(imageName, podInfo)
+		}
 	}
+}
+
+func (arb *Arbiter) queuePod(imageName string, podInfo *PodInfo) {
+	pi := newPodImage(imageName, podInfo, arb.annotation)
+	job := newJob(nil, pi, arb)
+
+	job.Load()
+	arb.jobQueue <- job
 }
 
 func (arb *Arbiter) getImages(done <-chan struct{}) {
@@ -280,7 +287,7 @@ func (arb *Arbiter) getPods() {
 	log.Printf("Found %d running pods\n", len(pods))
 
 	arb.Lock()
-	arb.imageUsage = make(map[string][]PodInfo) // clear for resync
+	arb.imageUsage = make(map[string]map[string]*PodInfo) // clear for resync
 	arb.Unlock()
 
 	for _, pod := range pods {
@@ -359,7 +366,23 @@ func (arb *Arbiter) registerPodUsage(image string, podName string, namespace str
 	arb.Lock()
 	defer arb.Unlock()
 
-	arb.imageUsage[image] = append(arb.imageUsage[image], PodInfo{namespace, podName})
+	podMap := arb.imageUsage[image]
+	if podMap == nil {
+		podMap = make(map[string]*PodInfo)
+	}
+
+	podInfo := podMap[podName]
+	if podInfo != nil {
+		log.Printf("Attempt to re-register pod %s in namespace %s\n", podName, namespace)
+		return
+	}
+
+	podInfo = &PodInfo{namespace, podName}
+	podMap[podName] = podInfo
+	arb.imageUsage[image] = podMap
+
+	arb.queuePod(image, podInfo)
+
 }
 
 // ValidateConfig validates if the Hub server configuration is valid. A login attempt will be performed.

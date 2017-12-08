@@ -32,11 +32,11 @@ import (
 
 type PodImage struct {
 	imageName string
-	podInfo   []PodInfo
+	podInfo   *PodInfo
 	annotate  *bdscommon.Annotator
 }
 
-func newPodImage(name string, info []PodInfo, annotate *bdscommon.Annotator) *PodImage {
+func newPodImage(name string, info *PodInfo, annotate *bdscommon.Annotator) *PodImage {
 
 	return &PodImage{
 		imageName: name,

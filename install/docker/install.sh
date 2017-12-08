@@ -314,7 +314,7 @@ then
 	# adm required to ignore quotas
 	oc adm new-project blackduck-scan
 else
-	echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
+	echo "Black Duck OpsSight connector already installed. Do you wish to upgrade?"
 	if [ "$INTERACTIVE" == "true" ]; then
 		select yn in "Yes" "No"; do
     			case $yn in
