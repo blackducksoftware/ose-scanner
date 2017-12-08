@@ -150,9 +150,9 @@ function uri_parser {
 }
 
 clear
-echo "============================================"
-echo "Black Duck OpsSight for OpenShift Installation"
-echo "============================================"
+echo "========================================================"
+echo "Black Duck OpsSight Connector for OpenShift Installation"
+echo "========================================================"
 
 # Docker push will fail otherwise
 if [ $UID -ne 0 ]; then
@@ -280,7 +280,7 @@ then
 else
 	
 	if [ "$INTERACTIVE" == "true" ]; then
-		echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
+		echo "Black Duck OpsSight Connector is already installed. Do you wish to upgrade?"
 		select yn in "Yes" "No"; do
     			case $yn in
         			Yes ) upgrade; break;;
@@ -288,7 +288,7 @@ else
     			esac
 		done
 	else
-		echo "Black Duck OpsSight scanner already installed. Processing upgrade..."
+		echo "Black Duck OpsSight connector is already installed. Processing upgrade..."
 		if [ $UPGRADE == 1 ]; then
 			upgrade
 		else

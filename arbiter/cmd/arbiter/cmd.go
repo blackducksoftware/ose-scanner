@@ -76,8 +76,7 @@ func main() {
 	}
 	openshiftClient, err := osclient.New(config)
 	if err != nil {
-		log.Printf("Error creating OpenShift client: %s", err)
-		os.Exit(2)
+		log.Printf("Error creating OpenShift client: %s. Running in pure Kubernetes mode", err)
 	}
 
 	arb := arbiter.NewArbiter(openshiftClient, kubeClient, hub)

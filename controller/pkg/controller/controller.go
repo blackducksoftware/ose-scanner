@@ -199,8 +199,14 @@ func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
 		controller: c,
 	}
 
-	if !job.IsImageStreamScanNeeded(c.hubParams.Config) {
-		log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
+	scanNeeded, supportsScan := job.IsImageStreamScanNeeded(c.hubParams.Config)
+
+	if !supportsScan {
+		scanNeeded = job.IsPodScanNeeded(c.hubParams.Config)
+	}
+
+	if !scanNeeded {
+		log.Printf("Image %s from previously scanned. Skipping scan.\n", imageItem.digest)
 		imageItem.scanned = true
 		return
 	}
@@ -210,7 +216,6 @@ func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
 
 	job.Load()
 	c.jobQueue <- job
-
 }
 
 func (c *Controller) imageScanned(Reference string) bool {
@@ -372,6 +377,24 @@ func (c *Controller) processPod(pod *kapi.Pod) {
 
 func (c *Controller) registerPodUsage(image string, podName string, namespace string) {
 	c.imageUsage[image] = append(c.imageUsage[image], PodInfo{namespace, podName})
+}
+
+func (c *Controller) findSinglePodForSpec(image string) (pod *kapi.Pod, podName string) {
+	for _, podInfo := range c.imageUsage[image] {
+		pod, err := c.kubeClient.Pods(podInfo.namespace).Get(podInfo.name)
+
+		if err != nil {
+			break
+		}
+
+		if pod.Status.Phase != kapi.PodRunning {
+			break
+		}
+
+		return pod, podInfo.name
+	}
+
+	return nil, ""
 }
 
 func (c *Controller) ValidateConfig() bool {

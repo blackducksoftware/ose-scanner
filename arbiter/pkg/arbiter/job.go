@@ -183,14 +183,18 @@ func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo
 func (job Job) ApplyAnnotationInfoToPods(newInfo bdscommon.ImageInfo) bool {
 
 	image := job.PodImage.imageName
+	updatedAll := true
 	for _, podInfo := range job.arbiter.imageUsage[image] {
 		ok := job.UpdatePodAnnotationInfo(podInfo.namespace, podInfo.name, newInfo)
 		if !ok {
-			log.Printf("Unable to annotate pods for image %s\n", image)
-			return false
+			updatedAll = false
 		}
 	}
-	return true
+
+	if !updatedAll {
+		log.Printf("One or more pods were not updated for image %s\n", image)
+	}
+	return updatedAll
 }
 
 func (job Job) mergeAnnotationResults(oldInfo bdscommon.ImageInfo, newInfo bdscommon.ImageInfo) bdscommon.ImageInfo {
