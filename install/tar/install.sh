@@ -331,20 +331,20 @@ dockerip=`oc get route -n default | grep docker-registry | tr -s ' ' | cut -d ' 
 dockerport=443
 
 echo "Attempting Docker login using secure remote route"
-docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 
 if [ $? -ne 0 ]
 then
 	echo "Attempting Docker login using insecure remote route"
 	dockerport=80
-	docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+	docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 	if [ $? -ne 0 ]
 	then
 		# Fixed issue if docker registry has Containered Gluster
 		dockerip=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 2`
 		dockerport=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 4 | cut -d '/' -f 1`
 		
-		docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+		docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 		
 		if [ $? -ne 0 ]
 		then
