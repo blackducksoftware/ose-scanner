@@ -30,7 +30,7 @@ spec:
           command:
             - /ose_scanner    
           terminationMessagePath: /dev/termination-log
-          imagePullPolicy: Always            
+          imagePullPolicy: IfNotPresent            
         - name: scan-controller
           image: '%CONTROLLER%'
           env:
@@ -80,7 +80,7 @@ spec:
               name: dockersocket
               mountPath: /var/run/docker.sock
           terminationMessagePath: /dev/termination-log
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
       restartPolicy: Always

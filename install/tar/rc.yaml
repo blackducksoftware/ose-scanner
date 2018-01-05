@@ -54,7 +54,7 @@ spec:
             - /ose_arbiter
           resources:
           terminationMessagePath: /dev/termination-log
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9035
               protocol: TCP
