@@ -54,13 +54,15 @@ items:
                   key: insecuretls
             - name: BDS_WORKERS
               value: '5'
+            - name: OSE_KUBERNETES_CONNECTOR
+              value: '%OSE_KUBERNETES_CONNECTOR%'           
             name: scan-arbiter
             image: 'docker.io/blackducksoftware/hub_ose_arbiter:%VERSION%'
             command:
               - /ose_arbiter
             resources:
             terminationMessagePath: /dev/termination-log
-            imagePullPolicy: Always
+            imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 9035
                 protocol: TCP
@@ -102,7 +104,7 @@ items:
             command:
               - /ose_scanner    
             terminationMessagePath: /dev/termination-log
-            imagePullPolicy: Always            
+            imagePullPolicy: IfNotPresent            
           - name: scan-controller
             image: 'docker.io/blackducksoftware/hub_ose_controller:%VERSION%'
             env:
@@ -140,6 +142,8 @@ items:
               value: 'docker.io/blackducksoftware/hub_ose_scanner:%VERSION%'
             - name: BDS_WORKERS
               value: '%WORKERS%'
+            - name: OSE_KUBERNETES_CONNECTOR
+              value: '%OSE_KUBERNETES_CONNECTOR%'
             command:
               - /ose_controller
             resources:
@@ -152,7 +156,7 @@ items:
                 name: dockersocket
                 mountPath: /var/run/docker.sock
             terminationMessagePath: /dev/termination-log
-            imagePullPolicy: Always
+            imagePullPolicy: IfNotPresent
             securityContext:
               privileged: true
         restartPolicy: Always

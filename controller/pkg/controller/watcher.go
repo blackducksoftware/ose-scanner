@@ -25,6 +25,7 @@ package controller
 import (
 	"log"
 	"time"
+	"os"
 
 	osclient "github.com/openshift/origin/pkg/client"
 	imageapi "github.com/openshift/origin/pkg/image/api"
@@ -59,7 +60,8 @@ func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
 
 func (w *Watcher) Run() {
 
-	if w.openshiftClient != nil {
+        log.Printf("Watcher OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
+	if (os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && w.openshiftClient != nil) {
 		log.Println("Subscribing to image stream events ....")
 
 		_, k8sCtl := framework.NewInformer(

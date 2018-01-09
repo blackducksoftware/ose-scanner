@@ -24,6 +24,7 @@ package arbiter
 
 import (
 	"log"
+	"os"
 )
 
 type Worker struct {
@@ -52,8 +53,8 @@ func (w Worker) Start() {
 			select {
 			case job := <-w.jobQueue:
 				scanned := false
-
-				if job.ScanImage != nil {
+				log.Printf("Worker OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
+				if (os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && job.ScanImage != nil) {
 					scanned = w.ProcessScanImage(job)
 				} else if job.PodImage != nil {
 					scanned = w.ProcessPodImage(job)

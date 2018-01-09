@@ -4,6 +4,7 @@
 
 options=$@
 
+OSE_KUBERNETES_CONNECTOR=N
 WORKER_COUNT=2
 INSECURE_TLS=0
 UPGRADE=0
@@ -331,20 +332,20 @@ dockerip=`oc get route -n default | grep docker-registry | tr -s ' ' | cut -d ' 
 dockerport=443
 
 echo "Attempting Docker login using secure remote route"
-docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 
 if [ $? -ne 0 ]
 then
 	echo "Attempting Docker login using insecure remote route"
 	dockerport=80
-	docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+	docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 	if [ $? -ne 0 ]
 	then
 		# Fixed issue if docker registry has Containered Gluster
 		dockerip=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 2`
 		dockerport=`oc get svc | egrep "^docker-registry[[:space:]].+$" | tr -s ' ' | cut -d ' ' -f 4 | cut -d '/' -f 1`
 		
-		docker login -u blackduck -e blackduck@blackducksoftware.com -p ${dockertoken} ${dockerip}:${dockerport}
+		docker login -u blackduck -p ${dockertoken} ${dockerip}:${dockerport}
 		
 		if [ $? -ne 0 ]
 		then
@@ -390,12 +391,12 @@ secretfile=$(mktemp /tmp/hub_ose_controller.XXXXXX)
 
 cp ./secret.yaml ${secretfile}
 
-sed -i "s/%USER%/${hubuser}/g" ${secretfile}
-sed -i "s/%PASSWD%/${hubpassword}/g" ${secretfile}
-sed -i "s/%HOST%/${uri_host}/g" ${secretfile}
-sed -i "s/%SCHEME%/${uri_schema}/g" ${secretfile}
-sed -i "s/%PORT%/${uri_port}/g" ${secretfile}
-sed -i "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
+sed -i -e "s/%USER%/${hubuser}/g" ${secretfile}
+sed -i -e "s/%PASSWD%/${hubpassword}/g" ${secretfile}
+sed -i -e "s/%HOST%/${uri_host}/g" ${secretfile}
+sed -i -e "s/%SCHEME%/${uri_schema}/g" ${secretfile}
+sed -i -e "s/%PORT%/${uri_port}/g" ${secretfile}
+sed -i -e "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
 
 if [ ! -z "`oc get secrets | grep bds-controller-credentials`" ];
 then
@@ -422,10 +423,11 @@ controller=${dockerip}:${dockerport}/blackduck-scan/hub_ose_controller:${version
 arbiter=${dockerip}:${dockerport}/blackduck-scan/hub_ose_arbiter:${version}
 
 # Note using ~ as separator to avoid URL conflict
-sed -i "s~%SCANNER%~${scanner}~g" ${podfile}
-sed -i "s~%WORKERS%~${workers}~g" ${podfile}
-sed -i "s~%CONTROLLER%~${controller}~g" ${podfile}
-sed -i "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
+sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 if [ ! -z "`oc get pod | grep scan-controller`" ];
 then
@@ -444,10 +446,11 @@ podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
 cp ./rc.yaml ${podfile}
 
 # Note using ~ as separator to avoid URL conflict
-sed -i "s~%SCANNER%~${scanner}~g" ${podfile}
-sed -i "s~%WORKERS%~${workers}~g" ${podfile}
-sed -i "s~%CONTROLLER%~${controller}~g" ${podfile}
-sed -i "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
+sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 if [ ! -z "`oc get pod | grep scan-arbiter`" ];
 then
@@ -466,10 +469,10 @@ podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
 cp ./svc.yaml ${podfile}
 
 # Note using ~ as separator to avoid URL conflict
-sed -i "s~%SCANNER%~${scanner}~g" ${podfile}
-sed -i "s~%WORKERS%~${workers}~g" ${podfile}
-sed -i "s~%CONTROLLER%~${controller}~g" ${podfile}
-sed -i "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
+sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
 
 if [ ! -z "`oc get svc | grep scan-arbiter`" ];
 then

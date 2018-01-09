@@ -5,6 +5,8 @@ all: clean build tar-install release-docker
 
 tar-build: clean build tar-install
 
+tar-kube-build: clean build tar-kube-install
+
 clean: 
 	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
 
@@ -19,9 +21,17 @@ tar-install:
 	mkdir ./output/$(BDS_VER)/tar; cp -a ./scanner/output/*.tar ./output/$(BDS_VER)/tar; cp -a ./controller/output/*.tar ./output/$(BDS_VER)/tar; cp -a ./arbiter/output/*.tar ./output/$(BDS_VER)/tar
 	./build-tar-installer.sh $(BDS_VER)
 
+tar-kube-install:
+	mkdir ./output/$(BDS_VER)/tar; cp -a ./scanner/output/*.tar ./output/$(BDS_VER)/tar; cp -a ./controller/output/*.tar ./output/$(BDS_VER)/tar; cp -a ./arbiter/output/*.tar ./output/$(BDS_VER)/tar
+	./build-tar-kube-installer.sh $(BDS_VER)
+
 docker-install:
 	rm -Rf ./output/$(BDS_VER)/docker; mkdir ./output/$(BDS_VER)/docker
 	./build-docker-installer.sh $(BDS_VER)
+
+docker-kube-install:
+	rm -Rf ./output/$(BDS_VER)/docker; mkdir ./output/$(BDS_VER)/docker
+	./build-docker-kube-installer.sh $(BDS_VER)
 
 travis: 
 	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
@@ -37,7 +47,11 @@ build-num:
 
 build-docker: clean build release-docker
 
+build-kube-docker: clean build release-kube-docker
+
 release-docker: docker-install docker-push
+
+release-kube-docker: docker-kube-install docker-push
 
 docker-push:
 	docker login ;\

@@ -1,19 +1,13 @@
 #!/bin/bash
 
-#
-# Set the version of Hub we want to connect to
-#
-#
-
 #set -x
 
 options=$@
 
-OSE_KUBERNETES_CONNECTOR=N
+OSE_KUBERNETES_CONNECTOR=Y
 WORKER_COUNT=2
 INSECURE_TLS=0
 UPGRADE=0
-HUB_VERSION="0.0.0"
 
 function cmdOptions() {
 
@@ -32,13 +26,13 @@ function cmdOptions() {
             --workers)
                 WORKER_COUNT=${arguments[index]} ;;
 
-            --hubversion)
-                HUB_VERSION=${arguments[index]} ;;
-
             --insecuretls) INSECURE_TLS=1 ;;
 
             --upgrade) UPGRADE=1 ;;
 
+            --usage) usage; exit 1 ;;
+
+		
         esac
       done
 
@@ -46,20 +40,21 @@ function cmdOptions() {
 
 function upgrade() {
     echo "Upgrading existing installation at user request."
-    oc delete project blackduck-scan
+    kubectl delete namespace blackduck-scan
 
     echo "Wait for delete request to fully complete..."
     sleep 5
 
     # wait for project resources to be removed
     while true; do
-        oc project blackduck-scan
+        kubectl get namespace blackduck-scan
 
         if [ $? -ne 0 ]
         then
             echo "Delete completed."
             # adm required to ignore quotas
-            oc adm new-project blackduck-scan
+            kubectl create namespace blackduck-scan
+            kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
             break			
         fi
         sleep 3
@@ -71,10 +66,10 @@ function usage() {
   cat << EOF
   Usage: install.sh <[options]>
   Options:
-          --hubversion     (Required) The version of Black Duck Hub to operate with.  
           --workers        (Optional) The quantity of concurrent scans per node. Default is 2
           --insecuretls    (Optional) If present, relaxes TLS validation
           --upgrade        (Optional) Upgrade existing installation if already installed
+          --usage          (Optional) This information
 
   Environment variables required for non-interactive install:
           BDS_HUB_SERVER   The fully qualified URL for the Black Duck Hub Server
@@ -89,7 +84,6 @@ function usage() {
 EOF
 
 }
-
 
 #
 # URI parsing function
@@ -158,9 +152,9 @@ function uri_parser {
 }
 
 clear
-echo "=============================================="
-echo "Black Duck OpsSight for OpenShift Installation"
-echo "=============================================="
+echo "============================================"
+echo "Black Duck OpsSight for Kubernetes Installation"
+echo "============================================"
 
 # Docker push will fail otherwise
 if [ $UID -ne 0 ]; then
@@ -169,11 +163,6 @@ if [ $UID -ne 0 ]; then
 fi
 
 cmdOptions
-
-echo " "
-echo "=============================================="
-echo "Black Duck Hub Configuration Information"
-echo "=============================================="
 
 INTERACTIVE="false"
 
@@ -192,24 +181,10 @@ DEF_MASTER=0
 allow_insecure="false"
 
 if [ "$INTERACTIVE" == "true" ]; then
-
-	tags=`curl --silent https://registry.hub.docker.com/v1/repositories/blackducksoftware/hub_ose_scanner/tags | sed -e 's/[][]//g' -e 's/"//g' -e 's/ //g' | tr '}' '\n'  | awk -F: '{print $3}' | tr '\n' ' '`
-	tags=`echo $tags Quit`
-	echo "Please select a supported Hub server version: "
-	tagOptions=($tags)
-	select supported_version in "${tagOptions[@]}"
-	do
-	    case $supported_version in
-        	"Quit")
-	            exit
-        	    ;;
-	        *) 
-			if [[ "$supported_version" != "" ]]; then
-    				echo "Installing version "$supported_version
-				break
-			fi;;
-	    esac
-	done
+	echo " "
+	echo "============================================"
+	echo "Black Duck Hub Configuration Information"
+	echo "============================================"
 
 	read -p "Hub server url (e.g. https://hub.mydomain.com:port): " huburl
 
@@ -230,18 +205,7 @@ if [ "$INTERACTIVE" == "true" ]; then
 	echo " "
 	read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
 else
-
-
-	tags=`curl --silent https://registry.hub.docker.com/v1/repositories/blackducksoftware/hub_ose_scanner/tags | sed -e 's/[][]//g' -e 's/"//g' -e 's/ //g' | tr '}' '\n'  | awk -F: '{print $3}' | tr '\n' ' '`
-
-	if [[ "$tags" == *"$HUB_VERSION"* ]]; then
-	    supported_version=$HUB_VERSION
-	    echo "Installing version "$supported_version
-	else
-	    echo "'$HUB_VERSION' isn't supported. Exiting."
-	    exit
-	fi
-
+	
 	huburl=$BDS_HUB_SERVER
 	hubuser=$BDS_HUB_USER
 	hubpassword=$BDS_HUB_PASSWD
@@ -256,67 +220,23 @@ else
 	fi
 fi
 
-echo "============================================"
-echo "OpenShift Configuration"
-echo "============================================"
-echo " "
-
-# Are we running on a master node or not?
-if [ -e /etc/origin/master/master-config.yaml ]; then
-    osserver=`grep masterPublicURL /etc/origin/master/master-config.yaml | egrep -o "https://.*[0-9]$" | head -n 1`
-    echo "Running on a Master --- public URL: $osserver"
-
-    isclusteradmin=`oc describe clusterPolicyBindings | sed -n '/Role:[[:space:]]*cluster-admin/,/Groups:/p' | grep "Users:" | grep $(oc whoami) | wc -l`
-    if [ $? -ne 0 ]
-    then
-         echo "Unable to validate user. User must have cluster-admin rights."
-         exit 1
-    fi
-
-    if [ $isclusteradmin -ne "1" ]
-    then
-         echo "User does not have required cluster-admin rights."
-         exit 1
-    fi
-	
-    DEF_MASTER=1
-else
-
-	if [ "$INTERACTIVE" == "true" ]; then
-    		read -p "OpenShift Cluster [$DEF_OSSERVER]: " osserver
-    		read -p "Cluster admin user name: " osuser
-    		read -sp "Cluster admin password: " ospassword
-	else
-		osserver=$BDS_OCP_SERVER
-		osuser=$BDS_OCP_USER
-		ospassword=$BDS_OCP_PASSWD
-	fi
-
-    	oc login $osserver -u $osuser -p $ospassword
-
-    	if [ $? -ne 0 ]
-    	then
-        	exit 1
-    	fi
-fi
-
-echo " "
-
 #apply defaults
 workers="${workers:-$DEF_WORKERS}"
 osserver="${osserver:-$DEF_OSSERVER}"
 hubuser="${hubuser:-$DEF_HUBUSER}"
 
 
-oc project blackduck-scan
+kubectl get namespace blackduck-scan
 
 if [ $? -ne 0 ]
 then
-	# adm required to ignore quotas
-	oc adm new-project blackduck-scan
+	# create the namespace and service account
+	kubectl create namespace blackduck-scan
+    kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
 else
-	echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
+	
 	if [ "$INTERACTIVE" == "true" ]; then
+		echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
 		select yn in "Yes" "No"; do
     			case $yn in
         			Yes ) upgrade; break;;
@@ -324,6 +244,7 @@ else
     			esac
 		done
 	else
+		echo "Black Duck OpsSight scanner already installed. Processing upgrade..."
 		if [ $UPGRADE == 1 ]; then
 			upgrade
 		else
@@ -334,45 +255,35 @@ else
 
 fi
 
+echo "Loading images into Docker engine. This may take a few minutes..."
 
-# remove default node selector to ensure full scans
-oc annotate namespace blackduck-scan openshift.io/node-selector="" --overwrite
+docker load < hub_ose_controller.tar
+docker load < hub_ose_scanner.tar
+docker load < hub_ose_arbiter.tar
 
-#
-# Handle service accounts
-#
-#
+version=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 2 `
+#controllerimageid=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 3 `
 
-oc project blackduck-scan
-oc create serviceaccount blackduck-scan
-
-# following allows us to write cluster level metadata for imagestreams
-oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:blackduck-scan:blackduck-scan
-
-# following allows us to launch priv'd containers for Docker machine access
-oc adm policy add-scc-to-user privileged system:serviceaccount:blackduck-scan:blackduck-scan
-
-version=${supported_version}
 #
 # Handle secrets
 #
 secretfile=$(mktemp /tmp/hub_ose_controller.XXXXXX)
 
-cp ./secret.yaml ${secretfile}
+cp ./secret-kubernetes.yaml ${secretfile}
 
-sed -i "s/%USER%/${hubuser}/g" ${secretfile}
-sed -i "s/%PASSWD%/${hubpassword}/g" ${secretfile}
-sed -i "s/%HOST%/${uri_host}/g" ${secretfile}
-sed -i "s/%SCHEME%/${uri_schema}/g" ${secretfile}
-sed -i "s/%PORT%/${uri_port}/g" ${secretfile}
-sed -i "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
+sed -i -e "s/%USER%/${hubuser}/g" ${secretfile}
+sed -i -e "s/%PASSWD%/${hubpassword}/g" ${secretfile}
+sed -i -e "s/%HOST%/${uri_host}/g" ${secretfile}
+sed -i -e "s/%SCHEME%/${uri_schema}/g" ${secretfile}
+sed -i -e "s/%PORT%/${uri_port}/g" ${secretfile}
+sed -i -e "s/%INSECURETLS%/${allow_insecure}/g" ${secretfile}
 
-if [ ! -z "`oc get secrets | grep bds-controller-credentials`" ];
+if [ ! -z "`kubectl get secrets --namespace=blackduck-scan | grep bds-controller-credentials`" ];
 then
-	oc delete secret bds-controller-credentials
+	kubectl delete secret bds-controller-credentials --namespace=blackduck-scan
 fi
 
-oc create -f ${secretfile}
+kubectl create -f ${secretfile} --namespace=blackduck-scan
 
 rm ${secretfile}
 
@@ -381,24 +292,60 @@ rm ${secretfile}
 #
 
 #
-# Create Application
+# Create DS
 #
 
 podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
-cp ./insight.yaml ${podfile}
+cp ./ds.yaml ${podfile}
+
+scanner=hub_ose_scanner:${version}
+controller=hub_ose_controller:${version}
+arbiter=hub_ose_arbiter:${version}
 
 # Note using ~ as separator to avoid URL conflict
-sed -i -e "s~%VERSION%~${version}~g" ${podfile}
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
 sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
-sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
 
-if [ ! -z "`oc get pod | grep scan-controller`" ];
-then
-	oc replace -f ${podfile}
-else
-	oc create -f ${podfile}
-fi
+kubectl create -f ${podfile} --namespace=blackduck-scan
+
+rm ${podfile}
+
+#
+# Create RC
+#
+
+podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
+cp ./rc.yaml ${podfile}
+
+# Note using ~ as separator to avoid URL conflict
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
+sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+
+kubectl create -f ${podfile} --namespace=blackduck-scan
+
+rm ${podfile}
+
+#
+# Create Service 
+#
+
+podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
+cp ./svc.yaml ${podfile}
+
+# Note using ~ as separator to avoid URL conflict
+sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
+sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
+sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+
+kubectl create -f ${podfile} --namespace=blackduck-scan
 
 
-echo "Installation complete. Validate application execution from within OpenShift."
+rm ${podfile}
+
+echo "Installation complete. Validate pod execution from within Kubernetes."
 
