@@ -36,9 +36,9 @@ import (
 
 	"net/http"
 
-	"ose-scanner/controller/pkg/controller"
+	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
 
-	bdscommon "ose-scanner/common"
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 

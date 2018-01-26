@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	bdscommon "ose-scanner/common"
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 

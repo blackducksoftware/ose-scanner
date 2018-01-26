@@ -25,7 +25,7 @@ package controller
 import (
 	"encoding/json"
 
-	bdscommon "ose-scanner/common"
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	osimageapi "github.com/openshift/api/image/v1"
 
