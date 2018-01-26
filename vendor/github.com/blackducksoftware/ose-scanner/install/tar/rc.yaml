@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: scan-arbiter
+  namespace: blackduck-scan
+spec:
+  replicas: 1
+  selector:
+    name: bds-arbiter
+  template:
+    metadata:
+      name: scan-arbiter
+      namespace: blackduck-scan
+      labels:
+        name: bds-arbiter
+    spec:
+      containers:
+        - env:
+          - name: BDS_HOST
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: hostname
+          - name: BDS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: port
+          - name: BDS_SCHEME
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: scheme
+          - name: BDS_USER
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: user
+          - name: BDS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: password
+          - name: BDS_INSECURE_HTTPS
+            valueFrom:
+              secretKeyRef:
+                name: bds-controller-credentials
+                key: insecuretls
+          - name: BDS_WORKERS
+            value: '5'
+          name: scan-arbiter
+          image: '%ARBITER%'
+          command:
+            - /ose_arbiter
+          resources:
+          terminationMessagePath: /dev/termination-log
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9035
+              protocol: TCP
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccountName: blackduck-scan
+      serviceAccount: blackduck-scan
+      securityContext:
+

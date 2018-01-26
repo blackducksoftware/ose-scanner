@@ -28,16 +28,13 @@ import (
 	"sync"
 	"time"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+	bdscommon "ose-scanner/common"
 
-	osclient "github.com/openshift/origin/pkg/client"
-	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
+	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 
-	"github.com/spf13/pflag"
-	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kclient "k8s.io/client-go/kubernetes"
 )
 
 type HubParams struct {
@@ -53,11 +50,8 @@ type PodInfo struct {
 }
 
 type Controller struct {
-	openshiftClient *osclient.Client
-	kubeClient      *kclient.Client
-	mapper          meta.RESTMapper
-	typer           runtime.ObjectTyper
-	f               *clientcmd.Factory
+	openshiftClient *osclient.ImageV1Client
+	kubeClient      *kclient.Clientset
 	jobQueue        chan Job
 	wait            sync.WaitGroup
 	images          map[string]*ScanImage
@@ -67,19 +61,13 @@ type Controller struct {
 	hubParams *HubParams
 }
 
-func NewController(os *osclient.Client, kc *kclient.Client, hub *HubParams) *Controller {
-
-	f := clientcmd.New(pflag.NewFlagSet("empty", pflag.ContinueOnError))
-	mapper, typer := f.Object(false)
+func NewController(os *osclient.ImageV1Client, kc *kclient.Clientset, hub *HubParams) *Controller {
 
 	jobQueue := make(chan Job, hub.Workers)
 
 	return &Controller{
 		openshiftClient: os,
 		kubeClient:      kc,
-		mapper:          mapper,
-		typer:           typer,
-		f:               f,
 		jobQueue:        jobQueue,
 		images:          make(map[string]*ScanImage),
 		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
@@ -200,7 +188,7 @@ func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
 	}
 
 	log.Printf("Controller OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
-	if (os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && !job.IsImageStreamScanNeeded(c.hubParams.Config)) {
+	if os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && !job.IsImageStreamScanNeeded(c.hubParams.Config) {
 		log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
 		imageItem.scanned = true
 		return
@@ -249,7 +237,7 @@ func (c *Controller) getImages() {
 		return
 	}
 
-	imageList, err := c.openshiftClient.Images().List(kapi.ListOptions{})
+	imageList, err := c.openshiftClient.Images().List(metav1.ListOptions{})
 
 	if err != nil {
 		log.Println(err)
@@ -266,7 +254,7 @@ func (c *Controller) getImages() {
 	log.Printf("Discovered %d images\n", len(images))
 
 	for _, image := range images {
-		c.AddImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		c.AddImage(image.GetName(), image.DockerImageReference)
 		time.Sleep(10 * time.Millisecond)
 	}
 
@@ -278,7 +266,7 @@ func (c *Controller) getImages() {
 
 func (c *Controller) getPods() {
 
-	podList, err := c.kubeClient.Pods(kapi.NamespaceAll).List(kapi.ListOptions{})
+	podList, err := c.kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 
 	if err != nil {
 		log.Println(err)
@@ -323,7 +311,7 @@ func (c *Controller) waitPodRunning(podName string, namespace string) {
 	log.Printf("Waiting for pod %s to enter running state.\n", podName)
 
 	for {
-		pod, err := c.kubeClient.Pods(namespace).Get(podName)
+		pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
 
 		if err != nil {
 			log.Printf("Error getting pod %s. Error: %s\n", podName, err)

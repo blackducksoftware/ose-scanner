@@ -1,0 +1,19 @@
+package: ose-scanner/arbiter
+import:
+- package: github.com/fsouza/go-dockerclient
+  version: bf97c77db7c945cbcdbf09d56c6f87a66f54537b
+- package: github.com/gorilla/mux
+  version: 8096f47503459bcc74d1f4c487b7e6e42e5746b5
+- package: github.com/openshift/api
+  version: master
+- package: github.com/openshift/client-go
+  version: master
+- package: github.com/spf13/pflag
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+- package: google.golang.org/grpc
+  repo: https://github.com/grpc/grpc-go
+  version: v1.9.1
+ignore:
+- ose-scanner/controller/pkg/controller
+- ose-scanner/common
+- ose-scanner/arbiter/pkg/arbiter
