@@ -25,7 +25,7 @@ package arbiter
 import (
 	"encoding/json"
 
-	bdscommon "ose-scanner/common"
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
 	"log"
 	"time"

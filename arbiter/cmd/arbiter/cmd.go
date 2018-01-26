@@ -35,9 +35,9 @@ import (
 
 	"net/http"
 
-	bdscommon "ose-scanner/common"
+	bdscommon "github.com/blackducksoftware/ose-scanner/common"
 
-	"ose-scanner/arbiter/pkg/arbiter"
+	"github.com/blackducksoftware/ose-scanner/arbiter/pkg/arbiter"
 
 	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 
