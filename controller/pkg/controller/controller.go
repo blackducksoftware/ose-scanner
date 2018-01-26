@@ -31,13 +31,9 @@ import (
 	bdscommon "ose-scanner/common"
 
 	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
-	"github.com/spf13/pflag"
-	"k8s.io/client-go/tools/clientcmd"
 
 	kapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	kclient "k8s.io/client-go/kubernetes"
 )
 
@@ -56,9 +52,6 @@ type PodInfo struct {
 type Controller struct {
 	openshiftClient *osclient.ImageV1Client
 	kubeClient      *kclient.Clientset
-	mapper          meta.RESTMapper
-	typer           runtime.ObjectTyper
-	f               *clientcmd.Factory
 	jobQueue        chan Job
 	wait            sync.WaitGroup
 	images          map[string]*ScanImage
@@ -70,17 +63,11 @@ type Controller struct {
 
 func NewController(os *osclient.ImageV1Client, kc *kclient.Clientset, hub *HubParams) *Controller {
 
-	f := clientcmd.New(pflag.NewFlagSet("empty", pflag.ContinueOnError))
-	mapper, typer := f.Object(false)
-
 	jobQueue := make(chan Job, hub.Workers)
 
 	return &Controller{
 		openshiftClient: os,
 		kubeClient:      kc,
-		mapper:          mapper,
-		typer:           typer,
-		f:               f,
 		jobQueue:        jobQueue,
 		images:          make(map[string]*ScanImage),
 		annotation:      bdscommon.NewAnnotator(hub.Version, hub.Config.Host),
@@ -267,7 +254,7 @@ func (c *Controller) getImages() {
 	log.Printf("Discovered %d images\n", len(images))
 
 	for _, image := range images {
-		c.AddImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		c.AddImage(image.GetName(), image.DockerImageReference)
 		time.Sleep(10 * time.Millisecond)
 	}
 

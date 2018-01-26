@@ -61,10 +61,10 @@ func (w *Watcher) Run() {
 	if w.openshiftClient != nil {
 		_, k8sCtl := cache.NewInformer(
 			&cache.ListWatch{
-				ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
+				ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 					return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
 				},
-				WatchFunc: func(opts kapi.ListOptions) (watch.Interface, error) {
+				WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 					return w.openshiftClient.ImageStreams(w.Namespace).Watch(opts)
 				},
 			},
@@ -87,7 +87,8 @@ func (w *Watcher) Run() {
 
 	log.Println("Subscribing to pod events ....")
 
-	podWatchList := cache.NewListWatchFromClient(w.arbiter.kubeClient, "pods", kapi.NamespaceAll, fields.Everything())
+	podWatchList := cache.NewListWatchFromClient(w.arbiter.kubeClient.RESTClient(), "pods",
+		kapi.NamespaceAll, fields.Everything())
 
 	_, k8sPodCtl := cache.NewInformer(
 		podWatchList,
@@ -128,7 +129,7 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 			log.Printf("Error seeking new image %s@%s: %s\n", digest, ref, err)
 			continue
 		}
-		w.arbiter.addImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+		w.arbiter.addImage(image.GetName(), image.DockerImageReference)
 	}
 }
 

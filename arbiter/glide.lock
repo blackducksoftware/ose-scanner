@@ -1,5 +1,5 @@
-hash: 4cc1d67ce95fc004cb35a86a84f11a797e80afb11aa52a6f0821c44d91b90b1a
-updated: 2018-01-26T11:51:15.103599786-05:00
+hash: f45568b49121cc72f40ed5114fca5657d0c4f02c645a01ddab24fe56aa113b95
+updated: 2018-01-26T12:22:39.996936845-05:00
 imports:
 - name: github.com/blackducksoftware/ose-scanner
   version: 5c22f7ec68095e6d3b16cddb2b0a2bf1d5b2af44
@@ -14,7 +14,7 @@ imports:
   subpackages:
   - log
 - name: github.com/fsouza/go-dockerclient
-  version: 2ff310040c161b75fa19fb9b287a90a6e03c0012
+  version: bf97c77db7c945cbcdbf09d56c6f87a66f54537b
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-openapi/jsonpointer
@@ -53,7 +53,7 @@ imports:
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
-  version: 53c1911da2b537f792e7cafcb446b05ffe33b996
+  version: 8096f47503459bcc74d1f4c487b7e6e42e5746b5
 - name: github.com/gregjones/httpcache
   version: 787624de3eb7bd915c329cba748687a3b22666a6
   subpackages:
@@ -94,7 +94,7 @@ imports:
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/spf13/pflag
-  version: e57e3eeb33f795204c1ca35f56c44f83227c6e66
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: golang.org/x/crypto
   version: 81e90905daefcd6fd217b62423c0908922eadb30
   subpackages:

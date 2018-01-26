@@ -27,7 +27,7 @@ import (
 	"log"
 	"strings"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+	bdscommon "ose-scanner/common"
 )
 
 type PodImage struct {

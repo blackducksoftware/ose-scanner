@@ -32,6 +32,7 @@ import (
 
 	kapi "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 // Job represents a scan activity
@@ -166,7 +167,7 @@ func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo
 	}
 	patchBytes := []byte(patch)
 
-	_, err = job.arbiter.kubeClient.CoreV1().RESTClient().Patch(kapi.StrategicMergePatchType).
+	_, err = job.arbiter.kubeClient.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(namespace, true).
 		Resource("pods").
 		Name(podName).
