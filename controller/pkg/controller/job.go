@@ -25,9 +25,13 @@ package controller
 import (
 	"encoding/json"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
-	osimageapi "github.com/openshift/origin/pkg/image/api"
-	kapi "k8s.io/kubernetes/pkg/api"
+	bdscommon "ose-scanner/common"
+
+	osimageapi "github.com/openshift/api/image/v1"
+
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types "k8s.io/apimachinery/pkg/types"
 
 	"log"
 	"strings"
@@ -79,7 +83,7 @@ func (job Job) UpdateImageAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
 		return false
 	}
 
-	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha)
+	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false
@@ -137,7 +141,7 @@ func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo
 	}
 	patchBytes := []byte(patch)
 
-	_, err = job.controller.kubeClient.RESTClient.Patch(kapi.StrategicMergePatchType).
+	_, err = job.controller.kubeClient.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).
 		NamespaceIfScoped(namespace, true).
 		Resource("pods").
 		Name(podName).
@@ -187,7 +191,7 @@ func (job Job) IsImageStreamScanNeeded(hubConfig *bdscommon.HubConfig) bool {
 		return false
 	}
 
-	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha)
+	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false

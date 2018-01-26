@@ -1,0 +1,20 @@
+package: .
+import:
+- package: github.com/fsouza/go-dockerclient
+  version: ~1.1.0
+- package: github.com/gorilla/mux
+  version: ~1.6.1
+- package: github.com/openshift/api
+  version: master
+- package: github.com/openshift/client-go
+  version: master
+- package: github.com/spf13/pflag
+  version: ~1.0.0
+- package: google.golang.org/grpc
+  repo: https://github.com/grpc/grpc-go
+  version: v1.9.1
+ignore:
+- ose-scanner/controller/pkg/controller
+- ose-scanner/common
+- ose-scanner/arbiter/pkg/arbiter
+

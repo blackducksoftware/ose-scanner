@@ -23,9 +23,11 @@ under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -34,16 +36,18 @@ import (
 
 	"net/http"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
-	"github.com/blackducksoftware/ose-scanner/controller/pkg/controller"
-	_ "github.com/openshift/origin/pkg/api/install"
-	osclient "github.com/openshift/origin/pkg/client"
-	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
+	"ose-scanner/controller/pkg/controller"
+
+	bdscommon "ose-scanner/common"
+
+	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
+
+	"k8s.io/client-go/kubernetes"
+	rest "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 
 	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/client/restclient"
-
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 var bds_version string
@@ -58,26 +62,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	config, err := restclient.InClusterConfig()
+	config, err := NewKubeClientFromCluster()
 	if err != nil {
 		log.Printf("Error getting in cluster config. Fallback to native config. Error message: %s", err)
-
-		config, err = clientcmd.DefaultClientConfig(pflag.NewFlagSet("empty", pflag.ContinueOnError)).ClientConfig()
+		config, err = NewKubeClientFromOutsideCluster()
 		if err != nil {
 			log.Printf("Error creating default client config: %s", err)
 			os.Exit(1)
 		}
 	}
 
-	kubeClient, err := kclient.New(config)
+	kubeClient, err := newKubeClientHelper(config)
 	if err != nil {
-		log.Printf("Error creating cluster config: %s", err)
+		log.Printf("Error creating kubernetes cluster config: %s", err)
 		os.Exit(1)
 	}
 
-	openshiftClient, err := osclient.New(config)
+	openshiftClient, err := osclient.NewForConfig(config)
 	if err != nil {
 		log.Printf("Error creating OpenShift client: %s. Running in pure Kubernetes mode", err)
+		os.Exit(1)
 	}
 
 	c := controller.NewController(openshiftClient, kubeClient, &hub)
@@ -108,6 +112,39 @@ func main() {
 
 	c.Stop()
 
+}
+
+func NewKubeClientFromCluster() (*rest.Config, error) {
+	config, err := rest.InClusterConfig()
+	return config, err
+}
+
+func NewKubeClientFromOutsideCluster() (*rest.Config, error) {
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Printf("Error creating default client config: %s", err)
+		return nil, err
+	}
+	return config, err
+}
+
+func newKubeClientHelper(config *rest.Config) (*kubernetes.Clientset, error) {
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatalf("unable to create kubernetes clientset: %s", err.Error())
+		return nil, err
+	}
+
+	return clientset, err
 }
 
 func init() {

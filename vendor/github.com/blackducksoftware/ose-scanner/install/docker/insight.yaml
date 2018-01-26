@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: List
+metadata:
+  name: "blackduck-scan components" 
+  resourceVersion: "1"
+items:
+- apiVersion: v1
+  kind: ReplicationController
+  metadata:
+    name: scan-arbiter
+    namespace: blackduck-scan
+  spec:
+    replicas: 1
+    selector:
+      name: bds-arbiter
+    template:
+      metadata:
+        name: scan-arbiter
+        namespace: blackduck-scan
+        labels:
+          name: bds-arbiter
+      spec:
+        containers:
+          - env:
+            - name: BDS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: hostname
+            - name: BDS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: port
+            - name: BDS_SCHEME
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: scheme
+            - name: BDS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: user
+            - name: BDS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: password
+            - name: BDS_INSECURE_HTTPS
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: insecuretls
+            - name: BDS_WORKERS
+              value: '5'
+            - name: OSE_KUBERNETES_CONNECTOR
+              value: '%OSE_KUBERNETES_CONNECTOR%'           
+            name: scan-arbiter
+            image: 'docker.io/blackducksoftware/hub_ose_arbiter:%VERSION%'
+            command:
+              - /ose_arbiter
+            resources:
+            terminationMessagePath: /dev/termination-log
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 9035
+                protocol: TCP
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 30
+        dnsPolicy: ClusterFirst
+        serviceAccountName: blackduck-scan
+        serviceAccount: blackduck-scan
+        securityContext:
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    name: scan-controller
+    namespace: blackduck-scan
+  spec:
+    selector:
+        matchLabels:
+          name: bds-controller 
+    template:
+      metadata:
+        name: scan-controller
+        namespace: blackduck-scan
+        labels:
+          name: bds-controller
+        annotations:
+          openshift.io/scc: privileged
+      spec:
+        volumes:
+          -
+            name: dockersocket
+            hostPath:
+              path: /var/run/docker.sock
+        containers:
+          - name: scan-precache-sidecar 
+            image: 'docker.io/blackducksoftware/hub_ose_scanner:%VERSION%'
+            env:
+            - name: BDS_LISTEN
+              value: '9036'   
+            command:
+              - /ose_scanner    
+            terminationMessagePath: /dev/termination-log
+            imagePullPolicy: IfNotPresent            
+          - name: scan-controller
+            image: 'docker.io/blackducksoftware/hub_ose_controller:%VERSION%'
+            env:
+            - name: BDS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: hostname
+            - name: BDS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: port
+            - name: BDS_SCHEME
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: scheme
+            - name: BDS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: user
+            - name: BDS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: password
+            - name: BDS_INSECURE_HTTPS
+              valueFrom:
+                secretKeyRef:
+                  name: bds-controller-credentials
+                  key: insecuretls
+            - name: BDS_SCANNER
+              value: 'docker.io/blackducksoftware/hub_ose_scanner:%VERSION%'
+            - name: BDS_WORKERS
+              value: '%WORKERS%'
+            - name: OSE_KUBERNETES_CONNECTOR
+              value: '%OSE_KUBERNETES_CONNECTOR%'
+            command:
+              - /ose_controller
+            resources:
+              requests:
+                cpu: 50m
+              limits:
+                cpu: 500m
+            volumeMounts:
+              -
+                name: dockersocket
+                mountPath: /var/run/docker.sock
+            terminationMessagePath: /dev/termination-log
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              privileged: true
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 30
+        dnsPolicy: ClusterFirst
+        serviceAccountName: blackduck-scan
+        serviceAccount: blackduck-scan
+        securityContext:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: scan-arbiter
+    namespace: blackduck-scan      
+  spec:
+    selector:                  
+      name: bds-arbiter
+    ports:
+    - nodePort: 0
+      port: 9035            
+      protocol: TCP
+      targetPort: 9035

@@ -1,0 +1,9 @@
+{
+	"ImportPath": "github.com/blackducksoftware/ose-scanner/scanner",
+	"GoVersion": "go1.6",
+	"GodepVersion": "v75",
+	"Packages": [
+		"./..."
+	],
+	"Deps": []
+}

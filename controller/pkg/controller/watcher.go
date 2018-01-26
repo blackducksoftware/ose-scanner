@@ -24,29 +24,28 @@ package controller
 
 import (
 	"log"
-	"time"
 	"os"
+	"time"
 
-	osclient "github.com/openshift/origin/pkg/client"
-	imageapi "github.com/openshift/origin/pkg/image/api"
-
-	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/watch"
+	imageapi "github.com/openshift/api/image/v1"
+	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
 )
 
 type Watcher struct {
-	openshiftClient *osclient.Client
+	openshiftClient *osclient.ImageV1Client
 	Namespace       string
 	controller      *Controller
 }
 
 // Create a new watcher
-func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
+func NewWatcher(os *osclient.ImageV1Client, c *Controller) *Watcher {
 
 	namespace := kapi.NamespaceAll
 
@@ -60,11 +59,11 @@ func NewWatcher(os *osclient.Client, c *Controller) *Watcher {
 
 func (w *Watcher) Run() {
 
-        log.Printf("Watcher OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
-	if (os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && w.openshiftClient != nil) {
+	log.Printf("Watcher OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
+	if os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && w.openshiftClient != nil {
 		log.Println("Subscribing to image stream events ....")
 
-		_, k8sCtl := framework.NewInformer(
+		_, k8sCtl := cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(opts kapi.ListOptions) (runtime.Object, error) {
 					return w.openshiftClient.ImageStreams(w.Namespace).List(opts)
@@ -75,7 +74,7 @@ func (w *Watcher) Run() {
 			},
 			&imageapi.ImageStream{},
 			time.Minute,
-			framework.ResourceEventHandlerFuncs{
+			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					w.ImageAdded(obj.(*imageapi.ImageStream))
 				},
@@ -94,11 +93,11 @@ func (w *Watcher) Run() {
 
 	podWatchList := cache.NewListWatchFromClient(w.controller.kubeClient, "pods", kapi.NamespaceAll, fields.Everything())
 
-	_, k8sPodCtl := framework.NewInformer(
+	_, k8sPodCtl := cache.NewInformer(
 		podWatchList,
 		&kapi.Pod{},
 		time.Minute,
-		framework.ResourceEventHandlerFuncs{
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				w.PodCreated(obj.(*kapi.Pod))
 			},
@@ -130,7 +129,7 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 			return
 		}
 		ref := tagEvents[0].Image
-		image, err := w.openshiftClient.Images().Get(ref)
+		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
 		if err != nil {
 			log.Printf("Error seeking new image %s@%s: %s\n", digest, ref, err)
 			continue
@@ -162,7 +161,7 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 			return
 		}
 		ref := tagEvents[0].Image
-		image, err := w.openshiftClient.Images().Get(ref)
+		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
 		if err != nil {
 			log.Printf("Error seeking updated image %s@%s: %s\n", digest, ref, err)
 			continue
@@ -184,7 +183,7 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 
 	for _, events := range tags {
 		ref := events.Items[0].Image
-		image, err := w.openshiftClient.Images().Get(ref)
+		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
 		if err != nil {
 			log.Printf("Error seeking deleted image %s@%s: %s\n", digest, ref, err)
 			continue

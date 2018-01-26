@@ -25,10 +25,13 @@ package arbiter
 import (
 	"encoding/json"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
-	kapi "k8s.io/kubernetes/pkg/api"
+	bdscommon "ose-scanner/common"
+
 	"log"
 	"time"
+
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Job represents a scan activity
@@ -77,7 +80,7 @@ func (job Job) GetImageAnnotationInfo() (result bool, info bdscommon.ImageInfo) 
 		return false, info
 	}
 
-	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
+	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false, info
@@ -105,7 +108,7 @@ func (job Job) UpdateImageAnnotationInfo(newInfo bdscommon.ImageInfo) bool {
 		return false
 	}
 
-	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha)
+	image, err := job.arbiter.openshiftClient.Images().Get(job.ScanImage.sha, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Job: Error getting image %s: %s\n", job.ScanImage.sha, err)
 		return false
@@ -163,7 +166,7 @@ func (job Job) UpdatePodAnnotationInfo(namespace string, podName string, newInfo
 	}
 	patchBytes := []byte(patch)
 
-	_, err = job.arbiter.kubeClient.RESTClient.Patch(kapi.StrategicMergePatchType).
+	_, err = job.arbiter.kubeClient.CoreV1().RESTClient().Patch(kapi.StrategicMergePatchType).
 		NamespaceIfScoped(namespace, true).
 		Resource("pods").
 		Name(podName).
