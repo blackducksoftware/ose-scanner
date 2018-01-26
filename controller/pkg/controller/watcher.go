@@ -91,7 +91,7 @@ func (w *Watcher) Run() {
 
 	log.Println("Subscribing to pod events ....")
 
-	podWatchList := cache.NewListWatchFromClient(w.controller.kubeClient.RESTClient(), "pods", kapi.NamespaceAll, fields.Everything())
+	podWatchList := cache.NewListWatchFromClient(w.controller.openshiftClient.RESTClient(), "pods", kapi.NamespaceAll, fields.Everything())
 
 	_, k8sPodCtl := cache.NewInformer(
 		podWatchList,
