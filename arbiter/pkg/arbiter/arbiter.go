@@ -28,16 +28,13 @@ import (
 	"sync"
 	"time"
 
-	bdscommon "github.com/blackducksoftware/ose-scanner/common"
+	bdscommon "ose-scanner/common"
 
-	osclient "github.com/openshift/origin/pkg/client"
-	"github.com/openshift/origin/pkg/cmd/util/clientcmd"
+	osclient "github.com/openshift/client-go/image/clientset/versioned/typed/image/v1"
 
-	"github.com/spf13/pflag"
-	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/runtime"
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kclient "k8s.io/client-go/kubernetes"
 )
 
 type HubParams struct {
@@ -53,11 +50,8 @@ type PodInfo struct {
 }
 
 type Arbiter struct {
-	openshiftClient   *osclient.Client
-	kubeClient        *kclient.Client
-	mapper            meta.RESTMapper
-	typer             runtime.ObjectTyper
-	f                 *clientcmd.Factory
+	openshiftClient   *osclient.ImageV1Client
+	kubeClient        *kclient.Clientset
 	jobQueue          chan *Job
 	wait              sync.WaitGroup
 	controllerDaemons map[string]*controllerDaemon
@@ -70,10 +64,7 @@ type Arbiter struct {
 	sync.RWMutex
 }
 
-func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter {
-
-	f := clientcmd.New(pflag.NewFlagSet("empty", pflag.ContinueOnError))
-	mapper, typer := f.Object(false)
+func NewArbiter(os *osclient.ImageV1Client, kc *kclient.Clientset, hub HubParams) *Arbiter {
 
 	Hub = hub
 
@@ -82,9 +73,6 @@ func NewArbiter(os *osclient.Client, kc *kclient.Client, hub HubParams) *Arbiter
 	return &Arbiter{
 		openshiftClient:   os,
 		kubeClient:        kc,
-		mapper:            mapper,
-		typer:             typer,
-		f:                 f,
 		jobQueue:          jobQueue,
 		images:            make(map[string]*ScanImage),
 		requestedImages:   make(map[string]string),
@@ -239,7 +227,7 @@ func (arb *Arbiter) getImages(done <-chan struct{}) {
 
 	if arb.openshiftClient != nil {
 
-		imageList, err := arb.openshiftClient.Images().List(kapi.ListOptions{})
+		imageList, err := arb.openshiftClient.Images().List(metav1.ListOptions{})
 
 		if err != nil {
 			log.Println(err)
@@ -252,7 +240,7 @@ func (arb *Arbiter) getImages(done <-chan struct{}) {
 		}
 
 		for _, image := range imageList.Items {
-			arb.addImage(image.DockerImageMetadata.ID, image.DockerImageReference)
+			arb.addImage(image.GetName(), image.DockerImageReference)
 		}
 
 	}
@@ -263,7 +251,7 @@ func (arb *Arbiter) getImages(done <-chan struct{}) {
 
 func (arb *Arbiter) getPods() {
 
-	podList, err := arb.kubeClient.Pods(kapi.NamespaceAll).List(kapi.ListOptions{})
+	podList, err := arb.kubeClient.CoreV1().Pods(kapi.NamespaceAll).List(metav1.ListOptions{})
 
 	if err != nil {
 		log.Println(err)
@@ -308,7 +296,7 @@ func (arb *Arbiter) waitPodRunning(podName string, namespace string) {
 	log.Printf("Waiting for pod %s to enter running state.\n", podName)
 
 	for {
-		pod, err := arb.kubeClient.Pods(namespace).Get(podName)
+		pod, err := arb.kubeClient.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
 
 		if err != nil {
 			log.Printf("Error getting pod %s. Error: %s\n", podName, err)

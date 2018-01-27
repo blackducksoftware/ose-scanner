@@ -1,0 +1,17 @@
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+# ignore license file created during build - project root is the correct one
+LICENSE
+
+# Folders
+_obj
+_test
+
+# Architecture specific extensions/prefixes
+output/*
+hub_scanner/scan.cli/*
+hub_scanner/*.zip
+build/*
+
