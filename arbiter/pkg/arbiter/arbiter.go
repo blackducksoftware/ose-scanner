@@ -201,6 +201,19 @@ func (arb *Arbiter) addImage(ID string, Reference string) {
 	}
 }
 
+func (arb *Arbiter) RemoveImage(ID string, Reference string) {
+
+	arb.Lock()
+	defer arb.Unlock()
+
+	_, ok := arb.images[Reference]
+	if ok {
+		delete(arb.images, Reference)
+		log.Printf("Removed %s from map\n", Reference)
+	}
+
+}
+
 func (arb *Arbiter) queueImagesForNotification() {
 	for _, image := range arb.images {
 		log.Printf("Queuing image %s for notification check\n", image.digest)
