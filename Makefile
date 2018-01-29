@@ -1,7 +1,7 @@
 BDS_VER ?= 4.4.0
 BUILD_NUMBER_FILE=build.txt
 
-all: clean build tar-install release-docker
+all: clean build tar-install
 
 tar-build: clean build tar-install
 

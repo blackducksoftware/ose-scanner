@@ -227,14 +227,13 @@ if [ -e /etc/origin/master/master-config.yaml ]; then
     isclusteradmin=`oc describe clusterPolicyBindings | sed -n '/Role:[[:space:]]*cluster-admin/,/Groups:/p' | grep "Users:" | grep $(oc whoami) | wc -l`
     if [ $? -ne 0 ]
     then
-         echo "Unable to validate user. User must have cluster-admin rights."
-         exit 1
-    fi
-
-    if [ $isclusteradmin -ne "1" ]
-    then
-         echo "User does not have required cluster-admin rights."
-         exit 1
+	 oc describe clusterrolebindings | grep Name | grep -q cluster-admin ; 
+	 if [[ $? -ge 1 ]]; then
+	 	echo "Unable to validate user. User must have cluster-admin rights."
+                exit 1
+	 else
+	 	echo "Found cluster role bindings for admin, you must be on 3.7"
+	 fi  
     fi
 	
     DEF_MASTER=1

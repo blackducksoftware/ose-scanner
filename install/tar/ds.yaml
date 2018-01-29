@@ -6,7 +6,7 @@ metadata:
 spec:
   selector:
       matchLabels:
-        name: bds-controller 
+        name: bds-controller
   template:
     metadata:
       name: scan-controller
@@ -22,15 +22,15 @@ spec:
           hostPath:
             path: /var/run/docker.sock
       containers:
-        - name: scan-precache-sidecar 
+        - name: scan-precache-sidecar
           image: '%SCANNER%'
           env:
           - name: BDS_LISTEN
-            value: '9036'   
+            value: '9036'
           command:
-            - /ose_scanner    
+            - /ose_scanner
           terminationMessagePath: /dev/termination-log
-          imagePullPolicy: IfNotPresent            
+          imagePullPolicy: IfNotPresent
         - name: scan-controller
           image: '%CONTROLLER%'
           env:
@@ -68,6 +68,8 @@ spec:
             value: '%SCANNER%'
           - name: BDS_WORKERS
             value: '%WORKERS%'
+          - name: OSE_KUBERNETES_CONNECTOR
+            value: '%OSE_KUBERNETES_CONNECTOR%'
           command:
             - /ose_controller
           resources:
@@ -89,3 +91,4 @@ spec:
       serviceAccountName: blackduck-scan
       serviceAccount: blackduck-scan
       securityContext:
+

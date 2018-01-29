@@ -32,7 +32,7 @@ function cmdOptions() {
 
             --usage) usage; exit 1 ;;
 
-		
+
         esac
       done
 
@@ -55,7 +55,7 @@ function upgrade() {
             # adm required to ignore quotas
             kubectl create namespace blackduck-scan
             kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
-            break			
+            break
         fi
         sleep 3
     done
@@ -205,7 +205,7 @@ if [ "$INTERACTIVE" == "true" ]; then
 	echo " "
 	read -p "Maximum concurrent scans [$DEF_WORKERS]: " workers
 else
-	
+
 	huburl=$BDS_HUB_SERVER
 	hubuser=$BDS_HUB_USER
 	hubpassword=$BDS_HUB_PASSWD
@@ -232,9 +232,9 @@ if [ $? -ne 0 ]
 then
 	# create the namespace and service account
 	kubectl create namespace blackduck-scan
-    kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
+  kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
 else
-	
+
 	if [ "$INTERACTIVE" == "true" ]; then
 		echo "Black Duck OpsSight scanner already installed. Do you wish to upgrade?"
 		select yn in "Yes" "No"; do
@@ -307,6 +307,7 @@ sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
 sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
 sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
 sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 kubectl create -f ${podfile} --namespace=blackduck-scan
 
@@ -324,13 +325,14 @@ sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
 sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
 sed -i -e "s~%CONTROLLER%~${controller}~g" ${podfile}
 sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
+sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 kubectl create -f ${podfile} --namespace=blackduck-scan
 
 rm ${podfile}
 
 #
-# Create Service 
+# Create Service
 #
 
 podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
