@@ -2,6 +2,7 @@
 
 cp -a ./install/docker/*.yaml ./output/$1/docker/
 cp -a ./install/docker/install.sh ./output/$1/docker/
+cp -a ./install/docker/install-kube.sh ./output/$1/docker/
 cp -a ./LICENSE ./output/$1/docker/
 cp -a ./build.txt ./output/$1/docker/
 cd ./output/$1/docker/
