@@ -1,4 +1,4 @@
-BDS_VER ?= 3.6.2
+BDS_VER ?= 4.4.0
 BUILD_NUMBER_FILE=build.txt
 
 all: clean build tar-install release-docker
@@ -7,7 +7,7 @@ tar-build: clean build tar-install
 
 tar-kube-build: clean build tar-kube-install
 
-clean: 
+clean:
 	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
 
 build:
@@ -33,13 +33,13 @@ docker-kube-install:
 	rm -Rf ./output/$(BDS_VER)/docker; mkdir ./output/$(BDS_VER)/docker
 	./build-docker-kube-installer.sh $(BDS_VER)
 
-travis: 
+travis:
 	rm -Rf ./output/$(BDS_VER); mkdir ./output; mkdir ./output/$(BDS_VER);
 	cd ./scanner; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
 	cd ./controller; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
 	cd ./arbiter; make travis BDS_SCANNER=$(BDS_VER) OCP_BUILD_NUMBER=$(OS_BUILD_NUMBER)
 
-release: build-num all 
+release: build-num all
 
 build-num:
 	@if ! test -f $(BUILD_NUMBER_FILE); then echo 0 > $(BUILD_NUMBER_FILE); fi
