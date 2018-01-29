@@ -48,6 +48,8 @@ spec:
                 key: insecuretls
           - name: BDS_WORKERS
             value: '5'
+          - name: OSE_KUBERNETES_CONNECTOR
+            value: '%OSE_KUBERNETES_CONNECTOR%'  
           name: scan-arbiter
           image: '%ARBITER%'
           command:

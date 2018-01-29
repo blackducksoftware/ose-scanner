@@ -61,7 +61,7 @@ function upgrade() {
             # create the blackduck-scan namespace and service account
             kubectl create namespace blackduck-scan
             kubectl create serviceaccount blackduck-scan --namespace=blackduck-scan
-            break			
+            break
         fi
         sleep 3
     done
@@ -72,7 +72,7 @@ function usage() {
   cat << EOF
   Usage: install.sh <[options]>
   Options:
-          --hubversion     (Required) The version of Black Duck Hub to operate with.  
+          --hubversion     (Required) The version of Black Duck Hub to operate with.
           --workers        (Optional) The quantity of concurrent scans per node. Default is 2
           --insecuretls    (Optional) If present, relaxes TLS validation
           --upgrade        (Optional) Upgrade existing installation if already installed
@@ -204,7 +204,7 @@ if [ "$INTERACTIVE" == "true" ]; then
         	"Quit")
 	            exit
         	    ;;
-	        *) 
+	        *)
 			if [[ "$supported_version" != "" ]]; then
     				echo "Installing version "$supported_version
 				break
@@ -334,6 +334,7 @@ cp ./insight.yaml ${podfile}
 # Note using ~ as separator to avoid URL conflict
 sed -i -e "s~%VERSION%~${version}~g" ${podfile}
 sed -i -e "s~%WORKERS%~${workers}~g" ${podfile}
+sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 kubectl create -f ${podfile}
 
