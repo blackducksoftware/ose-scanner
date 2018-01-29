@@ -74,6 +74,9 @@ func (w *Watcher) Run() {
 				AddFunc: func(obj interface{}) {
 					w.ImageAdded(obj.(*imageapi.ImageStream))
 				},
+				UpdateFunc: func(oldobj, newobj interface{}) {
+					w.ImageUpdated(newobj.(*imageapi.ImageStream))
+				},
 				DeleteFunc: func(obj interface{}) {
 					w.ImageDeleted(obj.(*imageapi.ImageStream))
 				},
@@ -133,6 +136,35 @@ func (w *Watcher) ImageAdded(is *imageapi.ImageStream) {
 	}
 }
 
+func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
+
+	tags := is.Status.Tags
+	if tags == nil {
+		log.Println("Image updated, but no tags")
+		return
+	}
+
+	digest := is.Spec.DockerImageRepository
+
+	log.Printf("ImageStream updated: %s\n", digest)
+
+	for _, events := range tags {
+		tagEvents := events.Items
+		if len(tagEvents) == 0 {
+			log.Printf("ImageStream %s has no associated image\n", digest)
+			return
+		}
+		ref := tagEvents[0].Image
+		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
+		if err != nil {
+			log.Printf("Error seeking updated image %s@%s: %s\n", digest, ref, err)
+			continue
+		}
+
+		w.arbiter.addImage(image.GetName(), image.DockerImageReference)
+	}
+}
+
 func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 
 	tags := is.Status.Tags
@@ -141,9 +173,17 @@ func (w *Watcher) ImageDeleted(is *imageapi.ImageStream) {
 		return
 	}
 
-	for tag, events := range tags {
-		digest := events.Items[0].Image
-		log.Printf("Image %s deleted with digest %s\n", tag, digest)
+	digest := is.Spec.DockerImageRepository
+
+	for _, events := range tags {
+		ref := events.Items[0].Image
+		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
+		if err != nil {
+			log.Printf("Error seeking deleted image %s@%s: %s\n", digest, ref, err)
+			continue
+		}
+
+		w.arbiter.RemoveImage(image.GetName(), image.DockerImageReference)
 	}
 }
 
