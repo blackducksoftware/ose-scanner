@@ -24,6 +24,7 @@ package arbiter
 
 import (
 	"log"
+	"os"
 	"time"
 
 	imageapi "github.com/openshift/api/image/v1"
@@ -58,7 +59,7 @@ func NewWatcher(os *osclient.ImageV1Client, c *Arbiter) *Watcher {
 
 func (w *Watcher) Run() {
 
-	if w.openshiftClient != nil {
+	if os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && w.openshiftClient != nil {
 		_, k8sCtl := cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
@@ -146,14 +147,13 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 
 	digest := is.Spec.DockerImageRepository
 
-	log.Printf("ImageStream updated: %s\n", digest)
-
 	for _, events := range tags {
 		tagEvents := events.Items
 		if len(tagEvents) == 0 {
 			log.Printf("ImageStream %s has no associated image\n", digest)
 			return
 		}
+
 		ref := tagEvents[0].Image
 		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
 		if err != nil {
@@ -161,6 +161,7 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 			continue
 		}
 
+		log.Printf("ImageStream updated image %s@%s: %s@%s\n", is.Status.DockerImageRepository, ref, image.GetName(), image.DockerImageReference)
 		w.arbiter.addImage(image.GetName(), image.DockerImageReference)
 	}
 }
