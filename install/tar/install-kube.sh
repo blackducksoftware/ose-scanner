@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+set -x
 
 options=$@
 
@@ -8,6 +8,11 @@ OSE_KUBERNETES_CONNECTOR=Y
 WORKER_COUNT=2
 INSECURE_TLS=0
 UPGRADE=0
+
+if [[ -z $DEFAULT_REPOSITORY ]]; then
+	echo "Need to export DEFAULT_REPOSITORY"
+	exit 1
+fi
 
 function cmdOptions() {
 
@@ -157,10 +162,10 @@ echo "Black Duck OpsSight for Kubernetes Installation"
 echo "============================================"
 
 # Docker push will fail otherwise
-if [ $UID -ne 0 ]; then
-  echo -e "\nThis script must be run as root\n"
-  exit 1
-fi
+#if [ $UID -ne 0 ]; then
+#  echo -e "\nThis script must be run as root\n"
+#  exit 1
+#fi
 
 cmdOptions
 
@@ -257,11 +262,9 @@ fi
 
 echo "Loading images into Docker engine. This may take a few minutes..."
 
-docker load < hub_ose_controller.tar
-docker load < hub_ose_scanner.tar
-docker load < hub_ose_arbiter.tar
+./kube-registry.sh
 
-version=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 2 `
+version=`sudo docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 2 `
 #controllerimageid=`docker images | grep "^hub_ose_controller" | sed -n 1p | tr -s ' ' | cut -d ' ' -f 3 `
 
 #
@@ -285,7 +288,7 @@ fi
 
 kubectl create -f ${secretfile} --namespace=blackduck-scan
 
-rm ${secretfile}
+#rm ${secretfile}
 
 #
 # Done secrets
@@ -298,9 +301,9 @@ rm ${secretfile}
 podfile=$(mktemp /tmp/hub_ose_controller_pod.XXXXXX)
 cp ./ds.yaml ${podfile}
 
-scanner=hub_ose_scanner:${version}
-controller=hub_ose_controller:${version}
-arbiter=hub_ose_arbiter:${version}
+scanner=$DEFAULT_REPOSITORY/hub_ose_scanner:${version}
+controller=$DEFAULT_REPOSITORY/hub_ose_controller:${version}
+arbiter=$DEFAULT_REPOSITORY/hub_ose_arbiter:${version}
 
 # Note using ~ as separator to avoid URL conflict
 sed -i -e "s~%SCANNER%~${scanner}~g" ${podfile}
@@ -310,7 +313,6 @@ sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
 sed -i -e "s~%OSE_KUBERNETES_CONNECTOR%~${OSE_KUBERNETES_CONNECTOR}~g" ${podfile}
 
 kubectl create -f ${podfile} --namespace=blackduck-scan
-
 rm ${podfile}
 
 #
@@ -346,8 +348,6 @@ sed -i -e "s~%ARBITER%~${arbiter}~g" ${podfile}
 
 kubectl create -f ${podfile} --namespace=blackduck-scan
 
-
 rm ${podfile}
 
 echo "Installation complete. Validate pod execution from within Kubernetes."
-
