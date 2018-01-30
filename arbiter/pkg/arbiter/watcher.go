@@ -147,22 +147,21 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 
 	digest := is.Spec.DockerImageRepository
 
-	log.Printf("ImageStream updated, name: %s, digest: %s\n", is.Status.DockerImageRepository, digest)
-
 	for _, events := range tags {
 		tagEvents := events.Items
 		if len(tagEvents) == 0 {
 			log.Printf("ImageStream %s has no associated image\n", digest)
 			return
 		}
+
 		ref := tagEvents[0].Image
-		log.Printf("Image reference:: %s", ref)
 		image, err := w.openshiftClient.Images().Get(ref, metav1.GetOptions{})
 		if err != nil {
 			log.Printf("Error seeking updated image %s@%s: %s\n", digest, ref, err)
 			continue
 		}
 
+		log.Printf("ImageStream updated image %s@%s: %s\n", is.Status.DockerImageRepository, ref, image.GetName())
 		w.arbiter.addImage(image.GetName(), image.DockerImageReference)
 	}
 }
