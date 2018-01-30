@@ -59,7 +59,6 @@ func NewWatcher(os *osclient.ImageV1Client, c *Controller) *Watcher {
 
 func (w *Watcher) Run() {
 
-	log.Printf("Watcher OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
 	if os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && w.openshiftClient != nil {
 		log.Println("Subscribing to image stream events ....")
 
