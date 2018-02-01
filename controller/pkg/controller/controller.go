@@ -187,7 +187,6 @@ func (c *Controller) queueImage(imageItem *ScanImage, Reference string) {
 		controller: c,
 	}
 
-	log.Printf("Controller OSE_KUBERNETES_CONNECTOR:%s:\n", os.Getenv("OSE_KUBERNETES_CONNECTOR"))
 	if os.Getenv("OSE_KUBERNETES_CONNECTOR") != "Y" && !job.IsImageStreamScanNeeded(c.hubParams.Config) {
 		log.Printf("Image %s previously scanned. Skipping scan.\n", imageItem.digest)
 		imageItem.scanned = true
