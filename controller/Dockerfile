@@ -14,8 +14,6 @@ COPY ./NOTICE /NOTICE
 # Container catalog requirements
 COPY ./LICENSE /licenses/
 COPY ./help.1 /help.1
-RUN mkdir /tmp/
-RUN chmod -R 777 /tmp/
 
 LABEL name="Black Duck OpsSight for OpenShift Controller" \
       vendor="Black Duck Software" \
