@@ -14,6 +14,9 @@ spec:
       labels:
         name: bds-arbiter
     spec:
+      volumes:
+        - name: logs
+          emptyDir: {}
       containers:
         - env:
           - name: BDS_HOST
@@ -55,6 +58,9 @@ spec:
           command:
             - /ose_arbiter
           resources:
+          volumeMounts:
+            - name: logs
+              mountPath: /tmp
           terminationMessagePath: /dev/termination-log
           imagePullPolicy: IfNotPresent
           ports:
