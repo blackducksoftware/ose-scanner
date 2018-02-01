@@ -17,10 +17,11 @@ spec:
         openshift.io/scc: privileged
     spec:
       volumes:
-        -
-          name: dockersocket
+        - name: dockersocket
           hostPath:
             path: /var/run/docker.sock
+        - name: logs
+          emptyDir: {}
       containers:
         - name: scan-precache-sidecar
           image: '%SCANNER%'
@@ -78,9 +79,10 @@ spec:
             limits:
               cpu: 500m
           volumeMounts:
-            -
-              name: dockersocket
+            - name: dockersocket
               mountPath: /var/run/docker.sock
+            - name: logs
+              mountPath: /tmp
           terminationMessagePath: /dev/termination-log
           imagePullPolicy: IfNotPresent
           securityContext:
