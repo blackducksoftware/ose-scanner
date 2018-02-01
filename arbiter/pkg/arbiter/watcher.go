@@ -161,7 +161,7 @@ func (w *Watcher) ImageUpdated(is *imageapi.ImageStream) {
 			continue
 		}
 
-		log.Printf("ImageStream updated image %s@%s: %s@%s\n", is.Status.DockerImageRepository, ref, image.GetName(), image.DockerImageReference)
+		//log.Printf("ImageStream updated image %s@%s: %s@%s\n", is.Status.DockerImageRepository, ref, image.GetName(), image.DockerImageReference)
 		w.arbiter.addImage(image.GetName(), image.DockerImageReference)
 	}
 }

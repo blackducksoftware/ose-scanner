@@ -72,7 +72,7 @@ func (w *Watcher) Run() {
 				},
 			},
 			&imageapi.ImageStream{},
-			time.Minute,
+			2 * time.Minute,
 			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					w.ImageAdded(obj.(*imageapi.ImageStream))
