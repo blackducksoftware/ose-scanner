@@ -32,7 +32,7 @@ See below for Build Status and the Go Report Card for the ose-scanner project.
 
 This project is under active development and has had several official releases, with more in the pipeline.
 
-### Contributing
+## Contributing
 
 We welcome all contributions. If you identify an issue, please raise it, and feel free to propose a solution.
 
@@ -42,7 +42,7 @@ When contributing to this project, please ensure that all changes have been veri
 
 Please note that PRs that change code (as opposed to readme/docs) and that lack information related to the orchestration-cluster and Hub versions tested against will take longer to approve.
 
-### Community Values
+## Community Values
 
 Part of any successful open source project is the ethos that the health of the community is more important than the code itself.
 
