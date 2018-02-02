@@ -194,11 +194,7 @@ func (job Job) IsImageStreamScanNeeded(hubConfig *bdscommon.HubConfig) bool {
 	image, err := job.controller.openshiftClient.Images().Get(job.ScanImage.sha, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("Job: Error getting image using sha %s: %s\n", job.ScanImage.sha, err)
-		image, err = job.controller.openshiftClient.Images().Get(job.ScanImage.imageId, metav1.GetOptions{})
-		if err != nil {
-			log.Printf("Job: Error getting image using image id %s: %s\n", job.ScanImage.imageId, err)
-			return false
-		}
+		return true
 	}
 
 	ref := job.ScanImage.digest
