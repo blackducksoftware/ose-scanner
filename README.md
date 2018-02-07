@@ -18,8 +18,8 @@ The latest version of the OpsSight Connector supports both [Kubernetes](https://
 For more information on the OpsSight Connector, see the:
 
 * [ose-scanner wiki](https://github.com/blackducksoftware/ose-scanner/wiki) for help with building, running and debugging
-* OpsSight Connector Installation Guide (Includes Release Notes and Supported Platforms)
-* OpsSight Connector Security Disclosures
+* OpsSight Connector [Installation Guide](https://blackducksoftware.atlassian.net/wiki/spaces/BDLM/pages/107741300/OpsSight+Installation+Guide) (Includes Release Notes and Supported Platforms)
+* OpsSight Connector [Security Disclosures](https://blackducksoftware.atlassian.net/wiki/spaces/BDLM/pages/107741331/OpsSight+Security+Disclosures)
 
 ## Build
 
