@@ -1,3 +1,27 @@
+# We have moved ! 
+
+The original 1.x ose-scanner has now been replaced with the OpsSight 2x product (based on the blackduck perceptor upstream project for distributed cloud native security scanning).
+
+Thanks to everyone, especially Tim Mackey, for all the hard work on this great product !
+
+# For the OpsSight product: 
+
+The downstream implementation of this project, hosted by Synopsys (Blackduck) is here: https://github.com/blackducksoftware/opssight-connector/. If you have questions feel free to use the contact list there, or just file an upstream issue.  Also feel free to contact jbeakley@synopsys.com, ngoldman@synopsys.com for a demo!
+
+# For the perceptor open source project (the upstream of OpsSight).
+
+OpsSight now has a 'pure' upstream implementation and is thus broken up into several microservices that are composable, and developed in a pure, non-proprietary manner (and also useable out of the box), and exist in their own independent development lifecycles.  These can be adopted and recomposed in any manner, and are all ASF licensed.  Feel free to get involved and create an issue on any of them if you have any questions.  You can contact our development team directly as well.
+
+https://github.com/blackducksoftware/perceptor
+https://github.com/blackducksoftware/perceivers
+https://github.com/blackducksoftware/perceptor-protoform
+https://github.com/blackducksoftware/perceptor-scanner
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+# Legacy content below ~ only for archival purposes.
+
 ## Overview
 
 The **Black Duck OpsSight Connector** (ose-scanner) automates the discovery of open-source components and security vulnerabilities in container images as they are instantiated in container-orchestration platforms. OpsSight helps you prevent known open source vulnerabilities from being deployed into production environments.
