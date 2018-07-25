@@ -3,6 +3,8 @@
 
 The original 1.x ose-scanner has now been replaced with the OpsSight 2x product (based on the Black Duck "Perceptor" upstream project for distributed cloud-native security scanning).
 
+Perceptor is a free and open source data-center wide security scanning solution, and can be found here at https://github.com/blackducksoftware/perceptor.  Its corresponding, supported downstream product, the "OpsSight connector", is detailed at https://github.com/blackducksoftware/opssight-connector/wiki.
+
 Thanks to everyone, especially Tim Mackey, for all the hard work on this great product!
 
 # The OpsSight product
